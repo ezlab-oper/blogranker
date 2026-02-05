@@ -239,12 +239,51 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_logs: {
+        Row: {
+          api_requests: number | null
+          bandwidth_mb: number | null
+          created_at: string
+          database_rows: number | null
+          database_size_mb: number | null
+          date: string
+          edge_function_invocations: number | null
+          id: string
+          storage_size_mb: number | null
+          updated_at: string
+        }
+        Insert: {
+          api_requests?: number | null
+          bandwidth_mb?: number | null
+          created_at?: string
+          database_rows?: number | null
+          database_size_mb?: number | null
+          date: string
+          edge_function_invocations?: number | null
+          id?: string
+          storage_size_mb?: number | null
+          updated_at?: string
+        }
+        Update: {
+          api_requests?: number | null
+          bandwidth_mb?: number | null
+          created_at?: string
+          database_rows?: number | null
+          database_size_mb?: number | null
+          date?: string
+          edge_function_invocations?: number | null
+          id?: string
+          storage_size_mb?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_database_stats: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never

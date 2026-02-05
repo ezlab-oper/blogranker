@@ -8,6 +8,7 @@ import Keywords from "./pages/Keywords";
 import Results from "./pages/Results";
 import Trends from "./pages/Trends";
 import Settings from "./pages/Settings";
+import Usage from "./pages/Usage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/results" element={<Results />} />
           <Route path="/trends" element={<Trends />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/usage" element={<Usage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
