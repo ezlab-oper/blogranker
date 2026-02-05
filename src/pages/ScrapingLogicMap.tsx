@@ -39,15 +39,21 @@ const naverLogic: LogicSection[] = [
     title: 'DOM 접근 방식',
     icon: <Code2 className="w-5 h-5" />,
     content: {
-      description: 'Firecrawl API를 통해 렌더링된 HTML을 마크다운으로 변환하여 파싱합니다.',
+      description: 'Firecrawl API를 통해 렌더링된 HTML을 마크다운으로 변환하여 파싱합니다. 네이버 통합검색에서 블로그는 두 영역에 위치하며, links 배열이 출현 순서대로 반환되므로 첫 번째 영역(type_head)의 블로그가 자연스럽게 우선 수집됩니다.',
       items: [
         { label: '수집 URL', value: 'search.naver.com/search.naver?query={keyword}', badge: '통합검색' },
-        { label: '파싱 대상', value: 'Markdown 링크 패턴 [title](url)' },
-        { label: '링크 배열', value: 'Firecrawl links 배열 (출현 순서 보장)' },
+        { label: '1차 블로그 영역', value: '#main_pack > div.spw_fsolid.type_head', badge: '우선순위 높음' },
+        { label: '2차 블로그 영역', value: '#main_pack > div.spw_fsolid._fsolid_body', badge: '2순위' },
+        { label: '파싱 대상', value: 'Firecrawl links 배열 (DOM 출현 순서 보장)' },
         { label: '유효 URL 패턴', value: 'blog.naver.com/{id}/{postId}, m.blog.naver.com/{id}/{postId}' },
         { label: '추가 패턴', value: 'PostView.nhn?blogId=..., PostView.naver?blogId=...' },
       ],
-      codeExample: `/blog\\.naver\\.com\\/[a-zA-Z0-9_-]+\\/\\d+/
+      codeExample: `/* 네이버 블로그 영역 셀렉터 (참고용) */
+1차 영역: #main_pack > div.spw_fsolid.type_head._fsolid_head
+2차 영역: #main_pack > div.spw_fsolid._fsolid_body
+
+/* URL 검증 정규식 */
+/blog\\.naver\\.com\\/[a-zA-Z0-9_-]+\\/\\d+/
 /m\\.blog\\.naver\\.com\\/[a-zA-Z0-9_-]+\\/\\d+/
 /PostView\\.(nhn|naver)\\?.*blogId=/`,
     },
