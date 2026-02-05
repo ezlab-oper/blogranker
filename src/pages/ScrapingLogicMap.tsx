@@ -125,14 +125,22 @@ const googleLogic: LogicSection[] = [
     title: 'DOM 접근 방식',
     icon: <Code2 className="w-5 h-5" />,
     content: {
-      description: 'Firecrawl API를 통해 구글 통합검색 결과 페이지를 마크다운으로 파싱합니다.',
+      description: 'Firecrawl API를 통해 구글 통합검색 결과 페이지를 마크다운으로 파싱합니다. 구글 검색 결과에서 블로그 포스트는 주로 #center_col 내부의 #rso 영역에 위치하며, div.MjjYud 요소에 하위 콘텐츠가 있는 경우 실제 검색 결과입니다.',
       items: [
         { label: '수집 URL', value: 'google.com/search?q={keyword}&hl=ko&ie=UTF-8', badge: '통합검색' },
-        { label: '파싱 대상', value: 'Markdown 링크 패턴 [title](url)' },
-        { label: '링크 배열', value: 'Firecrawl links 배열 (출현 순서 보장)' },
+        { label: 'Outer 영역', value: '#center_col (메인 검색 결과 컨테이너)', badge: '기본 영역' },
+        { label: 'Inner 영역', value: '#rso > div (검색 결과 리스트)', badge: '결과 영역' },
+        { label: '결과 요소', value: 'div.MjjYud (하위 요소 존재 시 유효한 결과)', badge: '판별 기준' },
+        { label: '파싱 대상', value: 'Firecrawl links 배열 (DOM 출현 순서 보장)' },
         { label: '블로그 도메인', value: 'tistory.com, blog.naver.com, velog.io, brunch.co.kr, medium.com' },
       ],
-      codeExample: `/tistory\\.com\\/\\d+/
+      codeExample: `/* 구글 검색 결과 영역 셀렉터 (참고용) */
+Outer 영역: #center_col
+Inner 영역: #rso > div
+결과 요소: div.MjjYud (하위 요소 있을 시 유효)
+
+/* URL 검증 정규식 */
+/tistory\\.com\\/\\d+/
 /tistory\\.com\\/entry\\//
 /velog\\.io\\/@[^/]+\\/[^/?]+/
 /brunch\\.co\\.kr\\/@[^/]+\\/\\d+/
