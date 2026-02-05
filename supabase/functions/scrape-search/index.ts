@@ -129,6 +129,30 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
   
   const blogDomains = ['tistory.com', 'blog.naver.com', 'velog.io', 'brunch.co.kr', 'medium.com', 'wordpress.com'];
   
+  // URLs to explicitly exclude (Google internal URLs, search pages, etc.)
+  const excludePatterns = [
+    'google.com/search',
+    'google.com/url',
+    'google.co.kr/search',
+    'google.co.kr/url',
+    'accounts.google.com',
+    'support.google.com',
+    'maps.google.com',
+    'translate.google.com',
+    'webcache.googleusercontent.com',
+  ];
+  
+  // Title patterns to exclude (search queries, navigation, etc.)
+  const excludeTitlePatterns = [
+    'site:tistory',
+    'site:blog.naver',
+    'site:velog',
+    'site:brunch',
+    'OR site:',
+    'inurl:',
+    'intitle:',
+  ];
+  
   // Parse markdown for blog links with ACTUAL titles only
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
@@ -137,14 +161,37 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
     const title = match[1].trim();
     const url = match[2].trim();
     
+    // Skip Google internal URLs
+    const isGoogleUrl = excludePatterns.some(pattern => url.includes(pattern));
+    if (isGoogleUrl) continue;
+    
+    // Skip titles that look like search queries
+    const isSearchQueryTitle = excludeTitlePatterns.some(pattern => 
+      title.toLowerCase().includes(pattern.toLowerCase())
+    );
+    if (isSearchQueryTitle) continue;
+    
     // Skip invalid titles (too short, navigation elements, or placeholder-like)
     if (!title || title.length < 5) continue;
     if (title.includes('검색') || title.includes('메뉴') || title.includes('로그인')) continue;
     if (title.startsWith('블로그 포스트') || title.startsWith('#')) continue;
+    // Skip titles that are just URLs or contain mostly special characters
+    if (title.startsWith('http') || title.startsWith('www.')) continue;
+    if (/^[\[\]_\-\s]+$/.test(title)) continue;
     
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
     
-    if (isBlogUrl && !urlToTitle.has(url)) {
+    // Additional validation: URL must be a direct blog post, not a search/category page
+    const isValidBlogUrl = isBlogUrl && (
+      /tistory\.com\/\d+/.test(url) ||           // tistory.com/123
+      /tistory\.com\/entry\//.test(url) ||       // tistory.com/entry/...
+      /blog\.naver\.com\/[^/]+\/\d+/.test(url) || // blog.naver.com/user/123
+      /velog\.io\/@[^/]+\/[^/]+/.test(url) ||    // velog.io/@user/post
+      /brunch\.co\.kr\/@[^/]+\/\d+/.test(url) || // brunch.co.kr/@user/123
+      /medium\.com\/@?[^/]+\/[^/]+/.test(url)    // medium.com/@user/post or medium.com/user/post
+    );
+    
+    if (isValidBlogUrl && !urlToTitle.has(url)) {
       urlToTitle.set(url, title);
     }
   }
