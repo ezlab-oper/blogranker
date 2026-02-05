@@ -30,38 +30,79 @@ function detectBlogPlatform(url: string): string | null {
   return null;
 }
 
-// Parse Naver search results from markdown
-function parseNaverResults(markdown: string): BlogResult[] {
+// Parse Naver blog search results from markdown
+// Naver blog search page has a different structure than the main search
+function parseNaverResults(markdown: string, links: string[] = []): BlogResult[] {
   const results: BlogResult[] = [];
-  
-  // Naver blog section pattern - look for blog entries
-  const blogSectionMatch = markdown.match(/## 블로그([\s\S]*?)(?=##|$)/i);
-  if (!blogSectionMatch) {
-    console.log('No blog section found in Naver results');
-    return results;
-  }
-  
-  const blogSection = blogSectionMatch[1];
-  
-  // Parse individual blog entries - typically formatted as links with titles
-  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let match;
   let rank = 1;
   
-  while ((match = linkPattern.exec(blogSection)) !== null && rank <= 10) {
+  // Strategy 1: Extract from links array (more reliable)
+  // Naver blog URLs follow pattern: blog.naver.com/PostView.naver or blog.naver.com/username/postid
+  const blogLinks = links.filter(link => 
+    link.includes('blog.naver.com') && 
+    (link.includes('/PostView') || /blog\.naver\.com\/[^/]+\/\d+/.test(link))
+  );
+  
+  for (const url of blogLinks) {
+    if (rank > 30) break;
+    
+    // Try to extract author from URL (blog.naver.com/username)
+    const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
+    const author = authorMatch ? authorMatch[1] : null;
+    
+    results.push({
+      rank: rank++,
+      title: `네이버 블로그 포스트 #${rank - 1}`,
+      author,
+      url,
+      snippet: null,
+      published_date: null,
+      platform: '네이버블로그',
+      thumbnail_url: null,
+    });
+  }
+  
+  // Strategy 2: Parse markdown content for blog entries
+  // Look for patterns like [title](blog.naver.com/...) or title links
+  const linkPattern = /\[([^\]]+)\]\((https?:\/\/blog\.naver\.com[^)]+)\)/g;
+  let match;
+  
+  while ((match = linkPattern.exec(markdown)) !== null && results.length < 30) {
     const title = match[1].trim();
     const url = match[2].trim();
     
-    // Filter for actual blog URLs
-    if (url.includes('blog.naver.com') || 
-        url.includes('tistory.com') || 
-        url.includes('velog.io') ||
-        url.includes('brunch.co.kr')) {
-      
+    // Skip if already added or if it's not a post URL
+    if (results.some(r => r.url === url)) continue;
+    if (!url.includes('/PostView') && !/blog\.naver\.com\/[^/]+\/\d+/.test(url)) continue;
+    
+    // Extract author from URL
+    const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
+    const author = authorMatch ? authorMatch[1] : null;
+    
+    results.push({
+      rank: results.length + 1,
+      title: title || `네이버 블로그 포스트`,
+      author,
+      url,
+      snippet: null,
+      published_date: null,
+      platform: '네이버블로그',
+      thumbnail_url: null,
+    });
+  }
+  
+  // Strategy 3: Also check for other blog platforms in Naver search
+  const otherBlogPattern = /\[([^\]]+)\]\((https?:\/\/(?:[^)]*(?:tistory\.com|velog\.io|brunch\.co\.kr)[^)]+))\)/g;
+  
+  while ((match = otherBlogPattern.exec(markdown)) !== null && results.length < 30) {
+    const title = match[1].trim();
+    const url = match[2].trim();
+    
+    if (!results.some(r => r.url === url)) {
       results.push({
-        rank: rank++,
+        rank: results.length + 1,
         title,
-        author: null, // Will try to extract from context
+        author: null,
         url,
         snippet: null,
         published_date: null,
@@ -71,30 +112,30 @@ function parseNaverResults(markdown: string): BlogResult[] {
     }
   }
   
+  // Re-rank results
+  results.forEach((r, i) => r.rank = i + 1);
+  
   return results;
 }
 
 // Parse Google search results from markdown
-function parseGoogleResults(markdown: string): BlogResult[] {
+function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[] {
   const results: BlogResult[] = [];
+  const addedUrls = new Set<string>();
   
-  // Google results pattern - look for links to blog domains
   const blogDomains = ['tistory.com', 'blog.naver.com', 'velog.io', 'brunch.co.kr', 'medium.com', 'wordpress.com'];
-  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let match;
-  let rank = 1;
   
-  while ((match = linkPattern.exec(markdown)) !== null && rank <= 30) {
-    const title = match[1].trim();
-    const url = match[2].trim();
+  // Strategy 1: Extract from links array first
+  for (const url of links) {
+    if (results.length >= 30) break;
     
-    // Check if URL is from a blog domain
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
-    
-    if (isBlogUrl) {
+    if (isBlogUrl && !addedUrls.has(url)) {
+      addedUrls.add(url);
+      
       results.push({
-        rank: rank++,
-        title,
+        rank: results.length + 1,
+        title: `블로그 포스트 #${results.length + 1}`,
         author: null,
         url,
         snippet: null,
@@ -102,6 +143,112 @@ function parseGoogleResults(markdown: string): BlogResult[] {
         platform: detectBlogPlatform(url),
         thumbnail_url: null,
       });
+    }
+  }
+  
+  // Strategy 2: Parse markdown for blog links with titles
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  
+  while ((match = linkPattern.exec(markdown)) !== null && results.length < 30) {
+    const title = match[1].trim();
+    const url = match[2].trim();
+    
+    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
+    
+    if (isBlogUrl && !addedUrls.has(url)) {
+      addedUrls.add(url);
+      
+      // Update title if we found a better one from markdown
+      const existingIndex = results.findIndex(r => r.url === url);
+      if (existingIndex >= 0 && title && !title.startsWith('블로그 포스트')) {
+        results[existingIndex].title = title;
+      } else if (existingIndex < 0) {
+        results.push({
+          rank: results.length + 1,
+          title: title || `블로그 포스트`,
+          author: null,
+          url,
+          snippet: null,
+          published_date: null,
+          platform: detectBlogPlatform(url),
+          thumbnail_url: null,
+        });
+      }
+    }
+  }
+  
+  // Re-rank results
+  results.forEach((r, i) => r.rank = i + 1);
+  
+  return results;
+}
+
+// Alternative parser for Naver VIEW tab (blog search)
+function parseNaverViewResults(markdown: string, links: string[] = []): BlogResult[] {
+  const results: BlogResult[] = [];
+  const addedUrls = new Set<string>();
+  
+  const blogDomains = ['blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
+  
+  // Extract all blog URLs from links
+  for (const url of links) {
+    if (results.length >= 30) break;
+    
+    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
+    // Skip navigation/utility URLs
+    const isUtilityUrl = url.includes('PostList') || 
+                         url.includes('BlogHome') || 
+                         url.includes('prologue') ||
+                         url.includes('category') ||
+                         url.includes('?Redirect') ||
+                         url.includes('nid.naver.com') ||
+                         url.includes('MyBlog.naver') ||
+                         url.includes('section.blog.naver.com');
+    
+    // Must be a post URL (contains numeric ID)
+    const isPostUrl = /blog\.naver\.com\/[^/]+\/\d+/.test(url) || 
+                      /tistory\.com\/\d+/.test(url) ||
+                      url.includes('velog.io/@') ||
+                      url.includes('brunch.co.kr/@');
+    
+    if (isBlogUrl && !isUtilityUrl && isPostUrl && !addedUrls.has(url)) {
+      addedUrls.add(url);
+      
+      // Extract author from Naver blog URL
+      let author: string | null = null;
+      if (url.includes('blog.naver.com')) {
+        const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
+        author = authorMatch ? authorMatch[1] : null;
+      }
+      
+      results.push({
+        rank: results.length + 1,
+        title: `블로그 포스트 #${results.length + 1}`,
+        author,
+        url,
+        snippet: null,
+        published_date: null,
+        platform: detectBlogPlatform(url),
+        thumbnail_url: null,
+      });
+    }
+  }
+  
+  // Try to extract titles from markdown
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  
+  while ((match = linkPattern.exec(markdown)) !== null) {
+    const title = match[1].trim();
+    const url = match[2].trim();
+    
+    // Update existing result with title
+    const existingResult = results.find(r => r.url === url);
+    if (existingResult && title && title.length > 5 && 
+        !title.includes('검색') && !title.includes('메뉴') && 
+        !title.includes('블로그') && !title.startsWith('블로그 포스트')) {
+      existingResult.title = title;
     }
   }
   
@@ -132,12 +279,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build search URL based on engine
+    // Build search URL based on engine - use blog-specific search for Naver
     let searchUrl: string;
     if (engine === 'naver') {
-      searchUrl = `https://search.naver.com/search.naver?query=${encodeURIComponent(keyword)}`;
+      // Use Naver's VIEW tab (blog search) for better blog results
+      searchUrl = `https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(keyword)}`;
     } else {
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&hl=ko`;
+      // Add blog-related terms to Google search for better blog results
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}+site:tistory.com+OR+site:blog.naver.com+OR+site:velog.io&hl=ko&num=30`;
     }
 
     console.log(`Scraping ${engine} for keyword: ${keyword}`);
@@ -154,7 +303,7 @@ Deno.serve(async (req) => {
         url: searchUrl,
         formats: ['markdown', 'links'],
         onlyMainContent: false,
-        waitFor: 3000, // Wait for dynamic content
+        waitFor: 5000, // Wait longer for dynamic content
       }),
     });
 
@@ -168,14 +317,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Parse results based on engine
+    // Parse results based on engine - use both markdown and links
     const markdown = data.data?.markdown || data.markdown || '';
+    const links: string[] = data.data?.links || data.links || [];
+    
+    console.log(`Received ${links.length} links from Firecrawl`);
+    
     let blogResults: BlogResult[];
 
     if (engine === 'naver') {
-      blogResults = parseNaverResults(markdown);
+      blogResults = parseNaverViewResults(markdown, links);
     } else {
-      blogResults = parseGoogleResults(markdown);
+      blogResults = parseGoogleResults(markdown, links);
     }
 
     console.log(`Found ${blogResults.length} blog results for ${engine}`);
@@ -186,7 +339,8 @@ Deno.serve(async (req) => {
         keyword,
         engine,
         results: blogResults,
-        raw_markdown: markdown.substring(0, 5000), // Truncate for debugging
+        raw_markdown: markdown.substring(0, 3000), // Truncate for debugging
+        links_count: links.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
