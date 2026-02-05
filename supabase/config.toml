@@ -1,1 +1,4 @@
 project_id = "ezmpngkjwgtebtswygrj"
+
+[functions.update-cron-schedule]
+verify_jwt = false
