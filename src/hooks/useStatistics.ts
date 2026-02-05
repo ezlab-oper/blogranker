@@ -28,6 +28,7 @@ export interface JobStats {
   total_jobs: number;
   successful_jobs: number;
   failed_jobs: number;
+  running_jobs: number;
   success_rate: number;
 }
 
@@ -254,6 +255,7 @@ export function useStatistics(dateRange?: DateRange) {
           total_jobs: 0,
           successful_jobs: 0,
           failed_jobs: 0,
+          running_jobs: 0,
           success_rate: 0,
         };
       }
@@ -261,12 +263,18 @@ export function useStatistics(dateRange?: DateRange) {
       const totalJobs = data.length;
       const successfulJobs = data.filter(j => j.status === 'completed').length;
       const failedJobs = data.filter(j => j.status === 'failed').length;
+      const runningJobs = data.filter(j => j.status === 'running' || j.status === 'pending').length;
+
+      // 성공률은 완료된 작업(성공+실패) 중 성공한 비율로 계산
+      const completedJobs = successfulJobs + failedJobs;
+      const successRate = completedJobs > 0 ? Math.round((successfulJobs / completedJobs) * 100) : 0;
 
       return {
         total_jobs: totalJobs,
         successful_jobs: successfulJobs,
         failed_jobs: failedJobs,
-        success_rate: totalJobs > 0 ? Math.round((successfulJobs / totalJobs) * 100) : 0,
+        running_jobs: runningJobs,
+        success_rate: successRate,
       };
     },
   });
