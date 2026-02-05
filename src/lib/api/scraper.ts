@@ -43,6 +43,16 @@ export interface CrawlProgress {
   failed: number;
 }
 
+// Abort controller for cancellation
+let currentAbortController: AbortController | null = null;
+
+export function cancelCrawlJob(): void {
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
+  }
+}
+
 export async function scrapeKeyword(
   keyword: string,
   engine: 'naver' | 'google'
@@ -65,7 +75,12 @@ export async function runCrawlJob(
   success: boolean;
   jobId?: string;
   error?: string;
+  cancelled?: boolean;
 }> {
+  // Create new abort controller for this job
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
   // Create a new crawl job
   const { data: job, error: jobError } = await supabase
     .from('crawl_jobs')
@@ -109,6 +124,21 @@ export async function runCrawlJob(
   // Process each keyword for each engine
   for (const kw of keywords) {
     for (const engine of shuffledEngines) {
+      // Check if cancelled
+      if (signal.aborted) {
+        // Update job status to cancelled
+        await supabase
+          .from('crawl_jobs')
+          .update({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', job.id);
+        
+        currentAbortController = null;
+        return { success: false, cancelled: true, jobId: job.id };
+      }
+
       try {
         const engineType = engine.name === '네이버' ? 'naver' : 'google';
         
@@ -181,9 +211,18 @@ export async function runCrawlJob(
     // Additional random delay between keywords (1-3 seconds)
     if (kw !== keywords[keywords.length - 1]) {
       const interKeywordDelay = randomDelay(1000, 3000);
-      await new Promise((resolve) => setTimeout(resolve, interKeywordDelay));
+      await new Promise((resolve) => {
+        const timeout = setTimeout(resolve, interKeywordDelay);
+        // Allow cancellation during delay
+        if (signal.aborted) {
+          clearTimeout(timeout);
+          resolve(undefined);
+        }
+      });
     }
   }
+
+  currentAbortController = null;
 
   // Complete the job
   await supabase

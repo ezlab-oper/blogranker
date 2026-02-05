@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tags, FileText, Calendar, TrendingUp, Play, Loader2 } from 'lucide-react';
+import { Tags, FileText, Calendar, TrendingUp, Play, Loader2, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useDashboardStats } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
-import { runCrawlJob, CrawlProgress } from '@/lib/api/scraper';
+import { runCrawlJob, cancelCrawlJob, CrawlProgress } from '@/lib/api/scraper';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -57,6 +57,14 @@ export default function Dashboard() {
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
         queryClient.invalidateQueries({ queryKey: ['recent-results'] });
         queryClient.invalidateQueries({ queryKey: ['crawl-results'] });
+      } else if (result.cancelled) {
+        toast({
+          title: '수집 취소됨',
+          description: `수집이 취소되었습니다. (${crawlProgress?.processed || 0}/${crawlProgress?.total || 0} 완료)`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['recent-results'] });
+        queryClient.invalidateQueries({ queryKey: ['crawl-results'] });
       } else {
         toast({
           title: '수집 실패',
@@ -75,6 +83,14 @@ export default function Dashboard() {
       setIsCrawling(false);
       setCrawlProgress(null);
     }
+  };
+
+  const handleCancelCrawl = () => {
+    cancelCrawlJob();
+    toast({
+      title: '취소 요청',
+      description: '수집 취소를 요청했습니다. 현재 작업 완료 후 중단됩니다.',
+    });
   };
 
   const progressPercent = crawlProgress 
@@ -132,9 +148,20 @@ export default function Dashboard() {
                   ({crawlProgress.currentEngine})
                 </span>
               </div>
-              <span className="text-muted-foreground">
-                {crawlProgress.processed} / {crawlProgress.total}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">
+                  {crawlProgress.processed} / {crawlProgress.total}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelCrawl}
+                  className="h-6 px-2 text-xs text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  <Square className="w-3 h-3 mr-1" />
+                  취소
+                </Button>
+              </div>
             </div>
             <Progress value={progressPercent} className="h-2" />
             <div className="flex justify-between text-xs text-muted-foreground">
