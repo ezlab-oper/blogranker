@@ -123,11 +123,14 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
   
+  // Only collect top 10 results from first page for highest visibility
+  const MAX_RESULTS = 10;
+  
   const blogDomains = ['tistory.com', 'blog.naver.com', 'velog.io', 'brunch.co.kr', 'medium.com', 'wordpress.com'];
   
   // Strategy 1: Extract from links array first
   for (const url of links) {
-    if (results.length >= 30) break;
+    if (results.length >= MAX_RESULTS) break;
     
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
     if (isBlogUrl && !addedUrls.has(url)) {
@@ -150,7 +153,7 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
   
-  while ((match = linkPattern.exec(markdown)) !== null && results.length < 30) {
+  while ((match = linkPattern.exec(markdown)) !== null && results.length < MAX_RESULTS) {
     const title = match[1].trim();
     const url = match[2].trim();
     
@@ -189,11 +192,14 @@ function parseNaverViewResults(markdown: string, links: string[] = []): BlogResu
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
   
+  // Only collect top 10 results from first page for highest visibility
+  const MAX_RESULTS = 10;
+  
   const blogDomains = ['blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
   
   // Extract all blog URLs from links
   for (const url of links) {
-    if (results.length >= 30) break;
+    if (results.length >= MAX_RESULTS) break;
     
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
     // Skip navigation/utility URLs
@@ -285,8 +291,8 @@ Deno.serve(async (req) => {
       // Use Naver's VIEW tab (blog search) for better blog results
       searchUrl = `https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(keyword)}`;
     } else {
-      // Add blog-related terms to Google search for better blog results
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}+site:tistory.com+OR+site:blog.naver.com+OR+site:velog.io&hl=ko&num=30`;
+      // Google search - only first page results (num=10) for highest visibility content
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}+site:tistory.com+OR+site:blog.naver.com+OR+site:velog.io&hl=ko&num=10`;
     }
 
     console.log(`Scraping ${engine} for keyword: ${keyword}`);
