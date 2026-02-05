@@ -12,10 +12,13 @@ import { useDashboardStats } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { runCrawlJob, cancelCrawlJob, CrawlProgress } from '@/lib/api/scraper';
 import { useToast } from '@/hooks/use-toast';
+import { useApiTracking } from '@/hooks/useApiTracking';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 export default function Dashboard() {
+  useApiTracking('dashboard');
+  
   const { data: stats, isLoading } = useDashboardStats();
   const { data: keywords } = useKeywords();
   const { toast } = useToast();

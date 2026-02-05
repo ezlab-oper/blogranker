@@ -242,6 +242,7 @@ export type Database = {
       usage_logs: {
         Row: {
           api_requests: number | null
+          api_requests_by_feature: Json | null
           bandwidth_mb: number | null
           created_at: string
           database_rows: number | null
@@ -254,6 +255,7 @@ export type Database = {
         }
         Insert: {
           api_requests?: number | null
+          api_requests_by_feature?: Json | null
           bandwidth_mb?: number | null
           created_at?: string
           database_rows?: number | null
@@ -266,6 +268,7 @@ export type Database = {
         }
         Update: {
           api_requests?: number | null
+          api_requests_by_feature?: Json | null
           bandwidth_mb?: number | null
           created_at?: string
           database_rows?: number | null
