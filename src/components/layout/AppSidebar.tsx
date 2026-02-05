@@ -30,7 +30,7 @@ const allNavItems = [
   { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: Map, label: '스크래핑 로직 맵', path: '/scraping-logic', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: Activity, label: '사용량', path: '/usage', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
-  { icon: Users, label: '관리자 관리', path: '/admin-management', requireFeatures: false, requireSettings: false, requireAdminManagement: true },
+  { icon: Users, label: '관리자', path: '/admin-management', requireFeatures: false, requireSettings: false, requireAdminManagement: true },
   { icon: Settings, label: '설정', path: '/settings', requireFeatures: false, requireSettings: true, requireAdminManagement: false },
 ];
 
