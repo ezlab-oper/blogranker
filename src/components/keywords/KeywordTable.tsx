@@ -36,9 +36,10 @@ import type { Keyword, KeywordCategory } from '@/types/database';
 
 interface KeywordTableProps {
   onEdit: (keyword: Keyword & { category: KeywordCategory | null }) => void;
+  readonly?: boolean;
 }
 
-export function KeywordTable({ onEdit }: KeywordTableProps) {
+export function KeywordTable({ onEdit, readonly = false }: KeywordTableProps) {
   const { data: keywords, isLoading } = useKeywords();
   const updateKeyword = useUpdateKeyword();
   const deleteKeyword = useDeleteKeyword();
@@ -97,13 +98,14 @@ export function KeywordTable({ onEdit }: KeywordTableProps) {
                   transition={{ delay: index * 0.02 }}
                   className="group"
                 >
-                  <TableCell>
-                    <Switch
-                      checked={kw.is_active}
-                      onCheckedChange={() => handleToggleActive(kw.id, kw.is_active)}
-                      className="data-[state=checked]:bg-success"
-                    />
-                  </TableCell>
+                                  <TableCell>
+                                    <Switch
+                                      checked={kw.is_active}
+                                      onCheckedChange={() => handleToggleActive(kw.id, kw.is_active)}
+                                      className="data-[state=checked]:bg-success"
+                                      disabled={readonly}
+                                    />
+                                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {kw.is_active ? (
@@ -135,27 +137,29 @@ export function KeywordTable({ onEdit }: KeywordTableProps) {
                     {formatDistanceToNow(new Date(kw.created_at), { addSuffix: true, locale: ko })}
                   </TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onEdit(kw)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          수정
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setDeleteTarget(kw.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          삭제
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {!readonly && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onEdit(kw)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            수정
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setDeleteTarget(kw.id)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </motion.tr>
               ))}

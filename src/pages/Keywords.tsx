@@ -7,10 +7,12 @@ import { KeywordDialog } from '@/components/keywords/KeywordDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApiTracking } from '@/hooks/useApiTracking';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Keyword, KeywordCategory } from '@/types/database';
 
 export default function Keywords() {
   useApiTracking('keywords');
+  const { canPerformActions } = useAuth();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
@@ -42,7 +44,11 @@ export default function Keywords() {
               추적할 키워드를 등록하고 관리하세요
             </p>
           </div>
-          <Button onClick={() => setDialogOpen(true)} className="gradient-primary text-white gap-2">
+          <Button 
+            onClick={() => setDialogOpen(true)} 
+            className="gradient-primary text-white gap-2"
+            disabled={!canPerformActions}
+          >
             <Plus className="w-4 h-4" />
             키워드 추가
           </Button>
@@ -57,7 +63,7 @@ export default function Keywords() {
         </div>
 
         {/* Table */}
-        <KeywordTable onEdit={handleEdit} />
+        <KeywordTable onEdit={handleEdit} readonly={!canPerformActions} />
 
         {/* Dialog */}
         <KeywordDialog open={dialogOpen} onOpenChange={handleDialogClose} editData={editData} />
