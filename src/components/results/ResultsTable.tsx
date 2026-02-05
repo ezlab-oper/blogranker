@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Calendar, User, FileText } from 'lucide-react';
+import { ExternalLink, Calendar, User, FileText, Download } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
+import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -38,7 +40,12 @@ function getEngineBadge(name: string) {
   return <Badge className="bg-google-blue text-white border-0 text-xs">구글</Badge>;
 }
 
-export function ResultsTable() {
+interface ResultsTableProps {
+  onExportReady?: (exportFn: () => void) => void;
+}
+
+export function ResultsTable({ onExportReady }: ResultsTableProps) {
+  const { toast } = useToast();
   const [filters, setFilters] = useState({
     keyword_id: '',
     search_engine_id: '',
@@ -54,6 +61,56 @@ export function ResultsTable() {
   });
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
+
+  const handleExportCSV = () => {
+    if (!results || results.length === 0) {
+      toast({
+        title: '내보낼 데이터 없음',
+        description: '내보낼 수집 결과가 없습니다.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const csvColumns = [
+      { key: 'rank' as const, header: '순위' },
+      { key: 'keyword_name' as const, header: '키워드' },
+      { key: 'engine_name' as const, header: '검색엔진' },
+      { key: 'blog_title' as const, header: '블로그 제목' },
+      { key: 'blog_author' as const, header: '작성자' },
+      { key: 'blog_platform' as const, header: '플랫폼' },
+      { key: 'blog_url' as const, header: 'URL' },
+      { key: 'snippet' as const, header: '요약' },
+      { key: 'crawled_at' as const, header: '수집일시' },
+    ];
+
+    const exportData = results.map((r) => ({
+      rank: r.rank,
+      keyword_name: r.keyword?.keyword || '',
+      engine_name: r.search_engine?.name || '',
+      blog_title: r.blog_title,
+      blog_author: r.blog_author || '',
+      blog_platform: r.blog_platform || '',
+      blog_url: r.blog_url,
+      snippet: r.snippet || '',
+      crawled_at: format(new Date(r.crawled_at), 'yyyy-MM-dd HH:mm:ss'),
+    }));
+
+    const csv = convertToCSV(exportData, csvColumns);
+    const filename = `블로그순위_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`;
+    
+    downloadCSV(csv, filename);
+
+    toast({
+      title: 'CSV 내보내기 완료',
+      description: `${results.length}개의 결과를 내보냈습니다.`,
+    });
+  };
+
+  // Expose export function to parent
+  if (onExportReady) {
+    onExportReady(handleExportCSV);
+  }
 
   if (isLoading) {
     return (
@@ -124,6 +181,15 @@ export function ResultsTable() {
           onClick={() => setFilters({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' })}
         >
           초기화
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={handleExportCSV}
+          className="ml-auto gap-2"
+        >
+          <Download className="w-4 h-4" />
+          CSV 내보내기
         </Button>
       </div>
 
