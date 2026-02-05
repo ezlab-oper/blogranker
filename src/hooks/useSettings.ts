@@ -92,6 +92,24 @@ export function useSettings() {
         if (error) throw error;
       }
 
+      // Update cron job via edge function
+      try {
+        const response = await supabase.functions.invoke('update-cron-schedule', {
+          body: {
+            enabled: newSettings.schedule.enabled,
+            time: newSettings.schedule.time,
+          },
+        });
+        
+        if (response.error) {
+          console.error('Failed to update cron schedule:', response.error);
+        } else {
+          console.log('Cron schedule updated:', response.data);
+        }
+      } catch (error) {
+        console.error('Error updating cron schedule:', error);
+      }
+
       return newSettings;
     },
     onSuccess: () => {
