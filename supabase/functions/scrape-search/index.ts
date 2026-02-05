@@ -21,7 +21,7 @@ interface BlogResult {
 
 // Detect blog platform from URL
 function detectBlogPlatform(url: string): string | null {
-  if (url.includes('blog.naver.com')) return '네이버블로그';
+  if (url.includes('blog.naver.com') || url.includes('m.blog.naver.com')) return '네이버블로그';
   if (url.includes('tistory.com')) return '티스토리';
   if (url.includes('velog.io')) return 'Velog';
   if (url.includes('brunch.co.kr')) return '브런치';
@@ -30,182 +30,107 @@ function detectBlogPlatform(url: string): string | null {
   return null;
 }
 
-// Parse Naver blog search results from markdown
-// Naver blog search page has a different structure than the main search
-function parseNaverResults(markdown: string, links: string[] = []): BlogResult[] {
-  const results: BlogResult[] = [];
-  let rank = 1;
-  
-  // Strategy 1: Extract from links array (more reliable)
-  // Naver blog URLs follow pattern: blog.naver.com/PostView.naver or blog.naver.com/username/postid
-  const blogLinks = links.filter(link => 
-    link.includes('blog.naver.com') && 
-    (link.includes('/PostView') || /blog\.naver\.com\/[^/]+\/\d+/.test(link))
-  );
-  
-  for (const url of blogLinks) {
-    if (rank > 30) break;
+// Extract author from blog URL
+function extractAuthorFromUrl(url: string): string | null {
+  // Naver blog: blog.naver.com/username/postid or PostView.nhn?blogId=username
+  if (url.includes('blog.naver.com')) {
+    // Pattern: blog.naver.com/username/postid
+    const pathMatch = url.match(/blog\.naver\.com\/([a-zA-Z0-9_-]+)\/\d+/);
+    if (pathMatch && pathMatch[1] !== 'PostView') return pathMatch[1];
     
-    // Try to extract author from URL (blog.naver.com/username)
-    const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
-    const author = authorMatch ? authorMatch[1] : null;
+    // Pattern: PostView.nhn?blogId=username or PostView.naver?blogId=username
+    const paramMatch = url.match(/blogId=([a-zA-Z0-9_-]+)/);
+    if (paramMatch) return paramMatch[1];
     
-    results.push({
-      rank: rank++,
-      title: `네이버 블로그 포스트 #${rank - 1}`,
-      author,
-      url,
-      snippet: null,
-      published_date: null,
-      platform: '네이버블로그',
-      thumbnail_url: null,
-    });
+    // Mobile pattern: m.blog.naver.com/username/postid
+    const mobileMatch = url.match(/m\.blog\.naver\.com\/([a-zA-Z0-9_-]+)\/\d+/);
+    if (mobileMatch) return mobileMatch[1];
+    
+    return null;
   }
   
-  // Strategy 2: Parse markdown content for blog entries
-  // Look for patterns like [title](blog.naver.com/...) or title links
-  const linkPattern = /\[([^\]]+)\]\((https?:\/\/blog\.naver\.com[^)]+)\)/g;
-  let match;
-  
-  while ((match = linkPattern.exec(markdown)) !== null && results.length < 30) {
-    const title = match[1].trim();
-    const url = match[2].trim();
-    
-    // Skip if already added or if it's not a post URL
-    if (results.some(r => r.url === url)) continue;
-    if (!url.includes('/PostView') && !/blog\.naver\.com\/[^/]+\/\d+/.test(url)) continue;
-    
-    // Extract author from URL
-    const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
-    const author = authorMatch ? authorMatch[1] : null;
-    
-    results.push({
-      rank: results.length + 1,
-      title: title || `네이버 블로그 포스트`,
-      author,
-      url,
-      snippet: null,
-      published_date: null,
-      platform: '네이버블로그',
-      thumbnail_url: null,
-    });
+  // Velog: velog.io/@username/post-title
+  if (url.includes('velog.io')) {
+    const match = url.match(/velog\.io\/@([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
   }
   
-  // Strategy 3: Also check for other blog platforms in Naver search
-  const otherBlogPattern = /\[([^\]]+)\]\((https?:\/\/(?:[^)]*(?:tistory\.com|velog\.io|brunch\.co\.kr)[^)]+))\)/g;
-  
-  while ((match = otherBlogPattern.exec(markdown)) !== null && results.length < 30) {
-    const title = match[1].trim();
-    const url = match[2].trim();
-    
-    if (!results.some(r => r.url === url)) {
-      results.push({
-        rank: results.length + 1,
-        title,
-        author: null,
-        url,
-        snippet: null,
-        published_date: null,
-        platform: detectBlogPlatform(url),
-        thumbnail_url: null,
-      });
-    }
+  // Brunch: brunch.co.kr/@username/postid
+  if (url.includes('brunch.co.kr')) {
+    const match = url.match(/brunch\.co\.kr\/@([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
   }
   
-  // Re-rank results
-  results.forEach((r, i) => r.rank = i + 1);
+  // Tistory: subdomain.tistory.com/postid
+  if (url.includes('tistory.com')) {
+    const match = url.match(/([a-zA-Z0-9_-]+)\.tistory\.com/);
+    return match ? match[1] : null;
+  }
   
-  return results;
+  return null;
 }
 
-// Parse Google search results from markdown
+
+// Parse Google integrated search results - extract blog posts from main search page
 function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[] {
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
-  const urlToTitle = new Map<string, string>();
   
-  // Only collect top 10 results from first page for highest visibility
+  // Only collect top 10 results for highest visibility
   const MAX_RESULTS = 10;
   
-  const blogDomains = ['tistory.com', 'blog.naver.com', 'velog.io', 'brunch.co.kr', 'medium.com', 'wordpress.com'];
+  // Blog domains to detect in integrated search results (include mobile versions)
+  const blogDomains = ['tistory.com', 'blog.naver.com', 'm.blog.naver.com', 'velog.io', 'brunch.co.kr', 'medium.com'];
   
-  // URLs to explicitly exclude (Google internal URLs, search pages, etc.)
+  // URLs to explicitly exclude (Google internal URLs)
   const excludePatterns = [
     'google.com/search',
     'google.com/url',
     'google.co.kr/search',
-    'google.co.kr/url',
     'accounts.google.com',
     'support.google.com',
     'maps.google.com',
     'translate.google.com',
     'webcache.googleusercontent.com',
+    'youtube.com',
+    'play.google.com',
   ];
   
-  // Title patterns to exclude (search queries, navigation, etc.)
-  const excludeTitlePatterns = [
-    'site:tistory',
-    'site:blog.naver',
-    'site:velog',
-    'site:brunch',
-    'OR site:',
-    'inurl:',
-    'intitle:',
-  ];
-  
-  // Parse markdown for blog links with ACTUAL titles only
-  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let match;
-  
-  while ((match = linkPattern.exec(markdown)) !== null) {
-    const title = match[1].trim();
-    const url = match[2].trim();
+  // First, extract links from the links array - these are ordered by appearance
+  for (const url of links) {
+    if (results.length >= MAX_RESULTS) break;
     
     // Skip Google internal URLs
-    const isGoogleUrl = excludePatterns.some(pattern => url.includes(pattern));
-    if (isGoogleUrl) continue;
+    const isExcluded = excludePatterns.some(pattern => url.includes(pattern));
+    if (isExcluded) continue;
     
-    // Skip titles that look like search queries
-    const isSearchQueryTitle = excludeTitlePatterns.some(pattern => 
-      title.toLowerCase().includes(pattern.toLowerCase())
-    );
-    if (isSearchQueryTitle) continue;
-    
-    // Skip invalid titles (too short, navigation elements, or placeholder-like)
-    if (!title || title.length < 5) continue;
-    if (title.includes('검색') || title.includes('메뉴') || title.includes('로그인')) continue;
-    if (title.startsWith('블로그 포스트') || title.startsWith('#')) continue;
-    // Skip titles that are just URLs or contain mostly special characters
-    if (title.startsWith('http') || title.startsWith('www.')) continue;
-    if (/^[\[\]_\-\s]+$/.test(title)) continue;
-    
+    // Check if it's a blog URL
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
+    if (!isBlogUrl) continue;
     
-    // Additional validation: URL must be a direct blog post, not a search/category page
-    const isValidBlogUrl = isBlogUrl && (
-      /tistory\.com\/\d+/.test(url) ||           // tistory.com/123
-      /tistory\.com\/entry\//.test(url) ||       // tistory.com/entry/...
-      /blog\.naver\.com\/[^/]+\/\d+/.test(url) || // blog.naver.com/user/123
-      /velog\.io\/@[^/]+\/[^/]+/.test(url) ||    // velog.io/@user/post
-      /brunch\.co\.kr\/@[^/]+\/\d+/.test(url) || // brunch.co.kr/@user/123
-      /medium\.com\/@?[^/]+\/[^/]+/.test(url)    // medium.com/@user/post or medium.com/user/post
-    );
+    // Validate it's an actual post URL (not category/home page)
+    const isValidPost = 
+      /tistory\.com\/\d+/.test(url) ||
+      /tistory\.com\/entry\//.test(url) ||
+      /blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
+      /m\.blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
+      /blog\.naver\.com\/PostView\.(nhn|naver)\?/.test(url) ||
+      /velog\.io\/@[^/]+\/[^/?]+/.test(url) ||
+      /brunch\.co\.kr\/@[^/]+\/\d+/.test(url) ||
+      /medium\.com\/[^/]+\/[^/]+-[a-f0-9]+/.test(url);
     
-    if (isValidBlogUrl && !urlToTitle.has(url)) {
-      urlToTitle.set(url, title);
-    }
-  }
-  
-  // Only add results with actual titles
-  for (const [url, title] of urlToTitle) {
-    if (results.length >= MAX_RESULTS) break;
+    if (!isValidPost) continue;
     if (addedUrls.has(url)) continue;
     
     addedUrls.add(url);
+    
+    // Extract author from URL using helper function
+    const author = extractAuthorFromUrl(url);
+    
     results.push({
       rank: results.length + 1,
-      title,
-      author: null,
+      title: `블로그 포스트`, // Will try to find title from markdown
+      author,
       url,
       snippet: null,
       published_date: null,
@@ -214,26 +139,108 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
     });
   }
   
-  // Re-rank results
-  results.forEach((r, i) => r.rank = i + 1);
+  // Try to match titles from markdown to URLs we found
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+  const urlToTitle = new Map<string, string>();
+  
+  while ((match = linkPattern.exec(markdown)) !== null) {
+    const title = match[1].trim();
+    const url = match[2].trim();
+    
+    // Skip invalid titles
+    if (!title || title.length < 5) continue;
+    if (title.startsWith('http') || title.includes('검색') || title.includes('로그인')) continue;
+    
+    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
+    if (isBlogUrl && !urlToTitle.has(url)) {
+      urlToTitle.set(url, title);
+    }
+  }
+  
+  // Update titles for results we found
+  for (const result of results) {
+    const title = urlToTitle.get(result.url);
+    if (title) {
+      result.title = title;
+    }
+  }
   
   return results;
 }
 
-// Alternative parser for Naver VIEW tab (blog search)
-function parseNaverViewResults(markdown: string, links: string[] = []): BlogResult[] {
+// Parse Naver integrated search results - extract blog posts from main search page
+// Naver's integrated search shows blogs in specific sections (블로그, VIEW 영역 등)
+function parseNaverIntegratedResults(markdown: string, links: string[] = []): BlogResult[] {
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
-  const urlToTitle = new Map<string, string>();
   
-  // Only collect top 10 results from first page for highest visibility
+  // Only collect top 10 results for highest visibility in integrated search
   const MAX_RESULTS = 10;
   
-  const blogDomains = ['blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
+  // Blog domains that appear in Naver integrated search (include mobile versions)
+  const blogDomains = ['blog.naver.com', 'm.blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
   
-  // Extract titles from markdown - ONLY collect items with actual titles
+  // Navigation/utility URLs to exclude
+  const excludePatterns = [
+    'PostList.naver',
+    'BlogHome.naver',
+    'MyBlog.naver',
+    'section.blog.naver.com',
+    'nid.naver.com',
+    'help.naver.com',
+    'prologue',
+    'category=',
+    'Redirect=',
+    '/blog_intro',
+  ];
+  
+  // First, extract blog links from the links array - ordered by appearance
+  for (const url of links) {
+    if (results.length >= MAX_RESULTS) break;
+    
+    // Check if it's a blog URL
+    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
+    if (!isBlogUrl) continue;
+    
+    // Skip utility/navigation pages
+    const isExcluded = excludePatterns.some(pattern => url.includes(pattern));
+    if (isExcluded) continue;
+    
+    // Must be an actual post URL with numeric ID
+    const isValidPost = 
+      /blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
+      /m\.blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
+      /blog\.naver\.com\/PostView\.(nhn|naver)\?/.test(url) ||
+      /tistory\.com\/\d+/.test(url) ||
+      /tistory\.com\/entry\//.test(url) ||
+      /velog\.io\/@[^/]+\/[^/?]+/.test(url) ||
+      /brunch\.co\.kr\/@[^/]+\/\d+/.test(url);
+    
+    if (!isValidPost) continue;
+    if (addedUrls.has(url)) continue;
+    
+    addedUrls.add(url);
+    
+    // Extract author from URL using helper function
+    const author = extractAuthorFromUrl(url);
+    
+    results.push({
+      rank: results.length + 1,
+      title: `블로그 포스트`, // Will try to find title from markdown
+      author,
+      url,
+      snippet: null,
+      published_date: null,
+      platform: detectBlogPlatform(url),
+      thumbnail_url: null,
+    });
+  }
+  
+  // Extract titles from markdown and match to URLs
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
+  const urlToTitle = new Map<string, string>();
   
   while ((match = linkPattern.exec(markdown)) !== null) {
     const title = match[1].trim();
@@ -242,60 +249,22 @@ function parseNaverViewResults(markdown: string, links: string[] = []): BlogResu
     // Skip invalid titles
     if (!title || title.length < 5) continue;
     if (title.includes('검색') || title.includes('메뉴') || title.includes('로그인')) continue;
-    if (title.includes('블로그홈') || title.includes('이웃목록')) continue;
-    if (title.startsWith('블로그 포스트') || title.startsWith('#')) continue;
+    if (title.includes('블로그홈') || title.includes('이웃목록') || title.includes('더보기')) continue;
+    if (title.startsWith('http') || title.startsWith('www.')) continue;
     
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
-    
-    // Skip navigation/utility URLs
-    const isUtilityUrl = url.includes('PostList') || 
-                         url.includes('BlogHome') || 
-                         url.includes('prologue') ||
-                         url.includes('category') ||
-                         url.includes('?Redirect') ||
-                         url.includes('nid.naver.com') ||
-                         url.includes('MyBlog.naver') ||
-                         url.includes('section.blog.naver.com');
-    
-    // Must be a post URL (contains numeric ID)
-    const isPostUrl = /blog\.naver\.com\/[^/]+\/\d+/.test(url) || 
-                      /tistory\.com\/\d+/.test(url) ||
-                      url.includes('velog.io/@') ||
-                      url.includes('brunch.co.kr/@');
-    
-    if (isBlogUrl && !isUtilityUrl && isPostUrl && !urlToTitle.has(url)) {
+    if (isBlogUrl && !urlToTitle.has(url)) {
       urlToTitle.set(url, title);
     }
   }
   
-  // Only add results with actual titles
-  for (const [url, title] of urlToTitle) {
-    if (results.length >= MAX_RESULTS) break;
-    if (addedUrls.has(url)) continue;
-    
-    addedUrls.add(url);
-    
-    // Extract author from Naver blog URL
-    let author: string | null = null;
-    if (url.includes('blog.naver.com')) {
-      const authorMatch = url.match(/blog\.naver\.com\/([^/?]+)/);
-      author = authorMatch ? authorMatch[1] : null;
+  // Update titles for results we found
+  for (const result of results) {
+    const title = urlToTitle.get(result.url);
+    if (title) {
+      result.title = title;
     }
-    
-    results.push({
-      rank: results.length + 1,
-      title,
-      author,
-      url,
-      snippet: null,
-      published_date: null,
-      platform: detectBlogPlatform(url),
-      thumbnail_url: null,
-    });
   }
-  
-  // Re-rank results
-  results.forEach((r, i) => r.rank = i + 1);
   
   return results;
 }
@@ -324,14 +293,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build search URL based on engine - use blog-specific search for Naver
+    // Build search URL based on engine - use INTEGRATED search (main search page)
+    // IMPORTANT: Do NOT use specialized tabs like "view" or add site filters
     let searchUrl: string;
     if (engine === 'naver') {
-      // Use Naver's VIEW tab (blog search) for better blog results
-      searchUrl = `https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(keyword)}`;
+      // Naver integrated search - main search page without 'where' parameter
+      searchUrl = `https://search.naver.com/search.naver?ie=UTF-8&query=${encodeURIComponent(keyword)}&sm=chr_hty`;
     } else {
-      // Google search - only first page results (num=10) for highest visibility content
-      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}+site:tistory.com+OR+site:blog.naver.com+OR+site:velog.io&hl=ko&num=10`;
+      // Google integrated search - main search without site filters
+      searchUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&hl=ko&ie=UTF-8`;
     }
 
     console.log(`Scraping ${engine} for keyword: ${keyword}`);
@@ -371,12 +341,12 @@ Deno.serve(async (req) => {
     let blogResults: BlogResult[];
 
     if (engine === 'naver') {
-      blogResults = parseNaverViewResults(markdown, links);
+      blogResults = parseNaverIntegratedResults(markdown, links);
     } else {
       blogResults = parseGoogleResults(markdown, links);
     }
 
-    console.log(`Found ${blogResults.length} blog results for ${engine}`);
+    console.log(`Found ${blogResults.length} blog results for ${engine} from integrated search`);
 
     return new Response(
       JSON.stringify({
