@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Bell, Shield, Loader2 } from 'lucide-react';
+import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -10,12 +10,26 @@ import { Button } from '@/components/ui/button';
 import { useSettings, type AllSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
   const { settings, isLoading, updateSettings, isUpdating } = useSettings();
   const { toast } = useToast();
   
   const [localSettings, setLocalSettings] = useState<AllSettings>(settings);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Sync local state with fetched settings
   useEffect(() => {
@@ -36,6 +50,33 @@ export default function Settings() {
         description: '설정을 저장하는 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDeleteAllResults = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('crawl_results')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (error) throw error;
+
+      toast({
+        title: '삭제 완료',
+        description: '모든 수집 결과가 삭제되었습니다.',
+      });
+      setDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to delete results:', error);
+      toast({
+        title: '삭제 실패',
+        description: '수집 결과를 삭제하는 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -218,6 +259,71 @@ export default function Settings() {
                 }))}
                 className="data-[state=checked]:bg-success" 
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Danger Zone */}
+        <Card className="shadow-card border-destructive/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              위험 구역
+            </CardTitle>
+            <CardDescription>이 작업은 되돌릴 수 없습니다</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-4 bg-destructive/5">
+              <div>
+                <Label className="text-base">수집 결과 전체 삭제</Label>
+                <p className="text-sm text-muted-foreground">
+                  모든 수집 결과 데이터를 삭제합니다. 키워드, 설정 등 다른 데이터는 유지됩니다.
+                </p>
+              </div>
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2">
+                    <Trash2 className="w-4 h-4" />
+                    전체 삭제
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="w-5 h-5" />
+                      정말 삭제하시겠습니까?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-2">
+                      <p>
+                        이 작업은 <strong>모든 수집 결과 데이터</strong>를 영구적으로 삭제합니다.
+                      </p>
+                      <p className="text-destructive font-medium">
+                        ⚠️ 이 작업은 되돌릴 수 없습니다!
+                      </p>
+                      <p className="text-sm">
+                        키워드, 카테고리, 설정 등 다른 데이터는 삭제되지 않습니다.
+                      </p>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAllResults}
+                      disabled={isDeleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          삭제 중...
+                        </>
+                      ) : (
+                        '삭제 확인'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </CardContent>
         </Card>
