@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,16 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { signIn, user, role, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in with role
+  useEffect(() => {
+    if (user && role && !isLoading) {
+      navigate('/');
+    }
+  }, [user, role, isLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,18 +31,22 @@ export default function Login() {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     
-    const { error } = await signIn(email, password);
+    const { error, success } = await signIn(email, password);
     
     if (error) {
       toast.error('로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.');
-      setIsLoading(false);
+      setIsSubmitting(false);
       return;
     }
 
-    toast.success('로그인되었습니다.');
-    navigate('/');
+    if (success) {
+      toast.success('로그인되었습니다.');
+      navigate('/');
+    }
+    
+    setIsSubmitting(false);
   };
 
   return (
@@ -64,7 +75,7 @@ export default function Login() {
                 placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 autoComplete="email"
               />
             </div>
@@ -77,7 +88,7 @@ export default function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                   autoComplete="current-password"
                   className="pr-10"
                 />
@@ -90,8 +101,8 @@ export default function Login() {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   로그인 중...
