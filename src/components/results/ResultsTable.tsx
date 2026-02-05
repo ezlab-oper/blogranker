@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Calendar, User, FileText, Download } from 'lucide-react';
+import { ExternalLink, Calendar, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -26,6 +26,8 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
 function getRankBadgeClass(rank: number) {
   if (rank === 1) return 'rank-badge rank-1';
   if (rank === 2) return 'rank-badge rank-2';
@@ -46,6 +48,8 @@ interface ResultsTableProps {
 
 export function ResultsTable({ onExportReady }: ResultsTableProps) {
   const { toast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState({
     keyword_id: '',
     search_engine_id: '',
@@ -61,6 +65,24 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
   });
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
+
+  // Pagination logic
+  const totalItems = results?.length || 0;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedResults = results?.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  const handleFilterChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (newSize: string) => {
+    setPageSize(Number(newSize));
+    setCurrentPage(1);
+  };
 
   const handleExportCSV = () => {
     if (!results || results.length === 0) {
@@ -128,12 +150,12 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
       <div className="flex flex-wrap gap-4 p-4 bg-card rounded-xl border shadow-card">
         <Select
           value={filters.keyword_id || 'all'}
-          onValueChange={(v) => setFilters((f) => ({ ...f, keyword_id: v === 'all' ? '' : v }))}
+          onValueChange={(v) => handleFilterChange({ ...filters, keyword_id: v === 'all' ? '' : v })}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="키워드 선택" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover">
             <SelectItem value="all">전체 키워드</SelectItem>
             {keywords?.map((kw) => (
               <SelectItem key={kw.id} value={kw.id}>
@@ -145,12 +167,12 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
 
         <Select
           value={filters.search_engine_id || 'all'}
-          onValueChange={(v) => setFilters((f) => ({ ...f, search_engine_id: v === 'all' ? '' : v }))}
+          onValueChange={(v) => handleFilterChange({ ...filters, search_engine_id: v === 'all' ? '' : v })}
         >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="검색 엔진" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover">
             <SelectItem value="all">전체 엔진</SelectItem>
             {engines?.map((engine) => (
               <SelectItem key={engine.id} value={engine.id}>
@@ -164,21 +186,21 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
           <Input
             type="date"
             value={filters.date_from}
-            onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))}
+            onChange={(e) => handleFilterChange({ ...filters, date_from: e.target.value })}
             className="w-40"
           />
           <span className="text-muted-foreground">~</span>
           <Input
             type="date"
             value={filters.date_to}
-            onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
+            onChange={(e) => handleFilterChange({ ...filters, date_to: e.target.value })}
             className="w-40"
           />
         </div>
 
         <Button
           variant="outline"
-          onClick={() => setFilters({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' })}
+          onClick={() => handleFilterChange({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' })}
         >
           초기화
         </Button>
@@ -193,13 +215,35 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
         </Button>
       </div>
 
-      {/* Results count */}
-      <p className="text-sm text-muted-foreground">
-        총 <span className="font-semibold text-foreground">{results?.length || 0}</span>개의 결과
-      </p>
+      {/* Results count and page size selector */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          총 <span className="font-semibold text-foreground">{totalItems}</span>개의 결과
+          {totalItems > 0 && (
+            <span className="ml-2">
+              ({startIndex + 1} - {Math.min(endIndex, totalItems)} 표시 중)
+            </span>
+          )}
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">페이지당</span>
+          <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+            <SelectTrigger className="w-20 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover">
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size}개
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Table */}
-      {results && results.length > 0 ? (
+      {paginatedResults && paginatedResults.length > 0 ? (
         <div className="rounded-xl border bg-card shadow-card overflow-hidden">
           <Table>
             <TableHeader>
@@ -213,7 +257,7 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {results.map((result, index) => (
+              {paginatedResults.map((result, index) => (
                 <motion.tr
                   key={result.id}
                   initial={{ opacity: 0 }}
@@ -279,6 +323,86 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
           <p>수집된 결과가 없습니다.</p>
         </div>
       )}
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+          >
+            처음
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center gap-1">
+            {generatePageNumbers(currentPage, totalPages).map((page, idx) =>
+              page === '...' ? (
+                <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">
+                  ...
+                </span>
+              ) : (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setCurrentPage(page as number)}
+                >
+                  {page}
+                </Button>
+              )
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            마지막
+          </Button>
+        </div>
+      )}
     </div>
   );
+}
+
+// Generate page numbers with ellipsis for large page counts
+function generatePageNumbers(current: number, total: number): (number | string)[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages: (number | string)[] = [];
+
+  if (current <= 4) {
+    pages.push(1, 2, 3, 4, 5, '...', total);
+  } else if (current >= total - 3) {
+    pages.push(1, '...', total - 4, total - 3, total - 2, total - 1, total);
+  } else {
+    pages.push(1, '...', current - 1, current, current + 1, '...', total);
+  }
+
+  return pages;
 }
