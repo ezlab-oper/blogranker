@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -13,25 +13,45 @@ import {
   Activity,
   Map,
   BarChart3,
+  Users,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuth } from '@/contexts/AuthContext';
+import { ROLE_PERMISSIONS } from '@/types/auth';
 
-const navItems = [
-  { icon: LayoutDashboard, label: '대시보드', path: '/' },
-  { icon: Tags, label: '키워드 관리', path: '/keywords' },
-  { icon: FileText, label: '수집 결과', path: '/results' },
-  { icon: TrendingUp, label: '순위 추이', path: '/trends' },
-  { icon: BarChart3, label: '수집 통계', path: '/statistics' },
-  { icon: Map, label: '스크래핑 로직 맵', path: '/scraping-logic' },
-  { icon: Activity, label: '사용량', path: '/usage' },
-  { icon: Settings, label: '설정', path: '/settings' },
+const allNavItems = [
+  { icon: LayoutDashboard, label: '대시보드', path: '/', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  { icon: Tags, label: '키워드 관리', path: '/keywords', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
+  { icon: FileText, label: '수집 결과', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
+  { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  { icon: Map, label: '스크래핑 로직 맵', path: '/scraping-logic', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  { icon: Activity, label: '사용량', path: '/usage', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  { icon: Users, label: '관리자 관리', path: '/admin-management', requireFeatures: false, requireSettings: false, requireAdminManagement: true },
+  { icon: Settings, label: '설정', path: '/settings', requireFeatures: false, requireSettings: true, requireAdminManagement: false },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, role, signOut, canAccessSettings, canManageAdmins, canUseFeatures } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  // Filter nav items based on permissions
+  const navItems = allNavItems.filter((item) => {
+    if (item.requireSettings && !canAccessSettings) return false;
+    if (item.requireAdminManagement && !canManageAdmins) return false;
+    if (item.requireFeatures && !canUseFeatures) return false;
+    return true;
+  });
 
   return (
     <motion.aside
@@ -66,7 +86,7 @@ export function AppSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -107,8 +127,52 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border">
+      {/* User info & Logout */}
+      <div className="p-4 border-t border-sidebar-border space-y-3">
+        <motion.div
+          initial={false}
+          animate={{ opacity: collapsed ? 0 : 1, height: collapsed ? 0 : 'auto' }}
+          className="overflow-hidden"
+        >
+          {user && role && (
+            <div className="mb-2">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">
+                {user.email}
+              </p>
+              <p className="text-xs text-sidebar-foreground/60">
+                {ROLE_PERMISSIONS[role].label}
+              </p>
+            </div>
+          )}
+        </motion.div>
+        
+        {collapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSignOut}
+                className="w-full text-sidebar-foreground hover:bg-sidebar-accent"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="font-medium">
+              로그아웃
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={handleSignOut}
+            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            <LogOut className="w-5 h-5 mr-2" />
+            로그아웃
+          </Button>
+        )}
+        
         <motion.div
           initial={false}
           animate={{ opacity: collapsed ? 0 : 1, height: collapsed ? 0 : 'auto' }}
