@@ -39,13 +39,30 @@ export interface OverviewStats {
   engines_active: number;
 }
 
-export function useStatistics() {
+export interface DateRange {
+  from: Date;
+  to: Date;
+}
+
+export function useStatistics(dateRange?: DateRange) {
+  const fromDate = dateRange?.from?.toISOString();
+  const toDate = dateRange?.to ? new Date(dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1).toISOString() : undefined;
+
   // Overview stats
   const overviewQuery = useQuery({
-    queryKey: ['statistics', 'overview'],
+    queryKey: ['statistics', 'overview', fromDate, toDate],
     queryFn: async (): Promise<OverviewStats> => {
+      let resultsQuery = supabase.from('crawl_results').select('rank', { count: 'exact' });
+      
+      if (fromDate) {
+        resultsQuery = resultsQuery.gte('crawled_at', fromDate);
+      }
+      if (toDate) {
+        resultsQuery = resultsQuery.lte('crawled_at', toDate);
+      }
+
       const [resultsRes, keywordsRes, enginesRes] = await Promise.all([
-        supabase.from('crawl_results').select('rank', { count: 'exact' }),
+        resultsQuery,
         supabase.from('keywords').select('id', { count: 'exact' }).eq('is_active', true),
         supabase.from('search_engines').select('id', { count: 'exact' }).eq('is_active', true),
       ]);
@@ -73,7 +90,7 @@ export function useStatistics() {
 
   // Engine stats
   const engineStatsQuery = useQuery({
-    queryKey: ['statistics', 'engines'],
+    queryKey: ['statistics', 'engines', fromDate, toDate],
     queryFn: async (): Promise<EngineStats[]> => {
       const { data: engines } = await supabase
         .from('search_engines')
@@ -84,10 +101,19 @@ export function useStatistics() {
       const stats: EngineStats[] = [];
 
       for (const engine of engines) {
-        const { data: results } = await supabase
+        let query = supabase
           .from('crawl_results')
           .select('rank')
           .eq('search_engine_id', engine.id);
+
+        if (fromDate) {
+          query = query.gte('crawled_at', fromDate);
+        }
+        if (toDate) {
+          query = query.lte('crawled_at', toDate);
+        }
+
+        const { data: results } = await query;
 
         if (results && results.length > 0) {
           const avgRank = results.reduce((sum, r) => sum + r.rank, 0) / results.length;
@@ -105,11 +131,18 @@ export function useStatistics() {
 
   // Platform stats
   const platformStatsQuery = useQuery({
-    queryKey: ['statistics', 'platforms'],
+    queryKey: ['statistics', 'platforms', fromDate, toDate],
     queryFn: async (): Promise<PlatformStats[]> => {
-      const { data } = await supabase
-        .from('crawl_results')
-        .select('blog_platform');
+      let query = supabase.from('crawl_results').select('blog_platform');
+
+      if (fromDate) {
+        query = query.gte('crawled_at', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('crawled_at', toDate);
+      }
+
+      const { data } = await query;
 
       if (!data) return [];
 
@@ -125,21 +158,21 @@ export function useStatistics() {
     },
   });
 
-  // Daily stats (last 14 days)
+  // Daily stats
   const dailyStatsQuery = useQuery({
-    queryKey: ['statistics', 'daily'],
+    queryKey: ['statistics', 'daily', fromDate, toDate],
     queryFn: async (): Promise<DailyStats[]> => {
-      const fourteenDaysAgo = new Date();
-      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      let query = supabase.from('crawl_results').select('crawled_at, search_engine_id');
 
-      const { data: results } = await supabase
-        .from('crawl_results')
-        .select('crawled_at, search_engine_id')
-        .gte('crawled_at', fourteenDaysAgo.toISOString());
+      if (fromDate) {
+        query = query.gte('crawled_at', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('crawled_at', toDate);
+      }
 
-      const { data: engines } = await supabase
-        .from('search_engines')
-        .select('id, name');
+      const { data: results } = await query;
+      const { data: engines } = await supabase.from('search_engines').select('id, name');
 
       if (!results || !engines) return [];
 
@@ -173,11 +206,18 @@ export function useStatistics() {
 
   // Rank distribution
   const rankDistributionQuery = useQuery({
-    queryKey: ['statistics', 'rankDistribution'],
+    queryKey: ['statistics', 'rankDistribution', fromDate, toDate],
     queryFn: async (): Promise<RankDistribution[]> => {
-      const { data } = await supabase
-        .from('crawl_results')
-        .select('rank');
+      let query = supabase.from('crawl_results').select('rank');
+
+      if (fromDate) {
+        query = query.gte('crawled_at', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('crawled_at', toDate);
+      }
+
+      const { data } = await query;
 
       if (!data) return [];
 
@@ -196,11 +236,18 @@ export function useStatistics() {
 
   // Job stats
   const jobStatsQuery = useQuery({
-    queryKey: ['statistics', 'jobs'],
+    queryKey: ['statistics', 'jobs', fromDate, toDate],
     queryFn: async (): Promise<JobStats> => {
-      const { data } = await supabase
-        .from('crawl_jobs')
-        .select('status, successful_keywords, failed_keywords');
+      let query = supabase.from('crawl_jobs').select('status, successful_keywords, failed_keywords, created_at');
+
+      if (fromDate) {
+        query = query.gte('created_at', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('created_at', toDate);
+      }
+
+      const { data } = await query;
 
       if (!data || data.length === 0) {
         return {
