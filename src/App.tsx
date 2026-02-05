@@ -9,6 +9,7 @@ import Results from "./pages/Results";
 import Trends from "./pages/Trends";
 import Settings from "./pages/Settings";
 import Usage from "./pages/Usage";
+import ScrapingLogicMap from "./pages/ScrapingLogicMap";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/keywords" element={<Keywords />} />
           <Route path="/results" element={<Results />} />
           <Route path="/trends" element={<Trends />} />
+          <Route path="/scraping-logic" element={<ScrapingLogicMap />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/usage" element={<Usage />} />
           <Route path="*" element={<NotFound />} />

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   TrendingUp,
   Activity,
+  Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ const navItems = [
   { icon: Tags, label: '키워드 관리', path: '/keywords' },
   { icon: FileText, label: '수집 결과', path: '/results' },
   { icon: TrendingUp, label: '순위 추이', path: '/trends' },
+  { icon: Map, label: '스크래핑 로직 맵', path: '/scraping-logic' },
   { icon: Activity, label: '사용량', path: '/usage' },
   { icon: Settings, label: '설정', path: '/settings' },
 ];
