@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ResultsTable } from '@/components/results/ResultsTable';
+import { useApiTracking } from '@/hooks/useApiTracking';
 
 export default function Results() {
+  useApiTracking('results');
   return (
     <AppLayout>
       <div className="space-y-6">

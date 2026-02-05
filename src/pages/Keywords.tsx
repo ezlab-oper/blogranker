@@ -6,9 +6,12 @@ import { KeywordTable } from '@/components/keywords/KeywordTable';
 import { KeywordDialog } from '@/components/keywords/KeywordDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useApiTracking } from '@/hooks/useApiTracking';
 import type { Keyword, KeywordCategory } from '@/types/database';
 
 export default function Keywords() {
+  useApiTracking('keywords');
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
 
