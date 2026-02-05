@@ -92,35 +92,6 @@ export function useSettings() {
         if (error) throw error;
       }
 
-      // Manage cron job based on schedule settings
-      const jobName = 'scheduled-blog-crawl';
-      const cronExpression = timeToCronExpression(newSettings.schedule.time);
-      const projectUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      // First unschedule any existing job (ignore errors if it doesn't exist)
-      try {
-        await supabase.rpc('unschedule_cron_job' as never, { job_name: jobName });
-      } catch {
-        // Job might not exist
-      }
-
-      // Schedule new job if enabled
-      if (newSettings.schedule.enabled) {
-        try {
-          await supabase.rpc('schedule_cron_job' as never, {
-            job_name: jobName,
-            schedule: cronExpression,
-            function_url: `${projectUrl}/functions/v1/scheduled-crawl`,
-            auth_token: anonKey,
-          });
-          console.log(`Cron job scheduled: ${cronExpression} for ${projectUrl}/functions/v1/scheduled-crawl`);
-        } catch (error) {
-          console.error('Failed to schedule cron job:', error);
-          // Don't throw - the settings are still saved
-        }
-      }
-
       return newSettings;
     },
     onSuccess: () => {
@@ -128,42 +99,13 @@ export function useSettings() {
     },
   });
 
-  // Manage cron job for scheduled crawl
-  const manageCronMutation = useMutation({
-    mutationFn: async ({ enabled, time }: { enabled: boolean; time: string }) => {
-      const jobName = 'scheduled-blog-crawl';
-      
-      // First, try to unschedule existing job
-      try {
-        await supabase.rpc('unschedule_cron_job' as any, { job_name: jobName });
-      } catch {
-        // Job might not exist, that's okay
-      }
-
-      if (enabled) {
-        const cronExpression = timeToCronExpression(time);
-        const projectUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        
-        // Schedule new job using pg_cron via RPC
-        // Note: This needs to be done via SQL insert since we don't have RPC for this
-        console.log(`Cron job would be scheduled: ${cronExpression}`);
-        console.log(`Would call: ${projectUrl}/functions/v1/scheduled-crawl`);
-        
-        return { scheduled: true, expression: cronExpression };
-      }
-
-      return { scheduled: false };
-    },
-  });
+  // Removed cron management - schedule settings are now checked directly in the scheduled-crawl edge function
 
   return {
     settings: settings || defaultSettings,
     isLoading,
     updateSettings: updateSettingsMutation.mutateAsync,
     isUpdating: updateSettingsMutation.isPending,
-    manageCron: manageCronMutation.mutateAsync,
-    isManagingCron: manageCronMutation.isPending,
     timeToCronExpression,
   };
 }
