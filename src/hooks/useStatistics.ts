@@ -29,6 +29,7 @@ export interface JobStats {
   successful_jobs: number;
   failed_jobs: number;
   running_jobs: number;
+  cancelled_jobs: number;
   success_rate: number;
 }
 
@@ -256,6 +257,7 @@ export function useStatistics(dateRange?: DateRange) {
           successful_jobs: 0,
           failed_jobs: 0,
           running_jobs: 0,
+          cancelled_jobs: 0,
           success_rate: 0,
         };
       }
@@ -263,9 +265,15 @@ export function useStatistics(dateRange?: DateRange) {
       const totalJobs = data.length;
       const successfulJobs = data.filter(j => j.status === 'completed').length;
       const failedJobs = data.filter(j => j.status === 'failed').length;
-      const runningJobs = data.filter(j => j.status === 'running' || j.status === 'pending').length;
+      const cancelledJobs = data.filter(j => j.status === 'cancelled').length;
+      // running/pending 상태이면서 1시간 이상 지난 작업은 stale로 간주하고 제외
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const runningJobs = data.filter(j => 
+        (j.status === 'running' || j.status === 'pending') && 
+        j.created_at > oneHourAgo
+      ).length;
 
-      // 성공률은 완료된 작업(성공+실패) 중 성공한 비율로 계산
+      // 성공률은 완료된 작업(성공+실패) 중 성공한 비율로 계산 (취소된 작업은 제외)
       const completedJobs = successfulJobs + failedJobs;
       const successRate = completedJobs > 0 ? Math.round((successfulJobs / completedJobs) * 100) : 0;
 
@@ -274,6 +282,7 @@ export function useStatistics(dateRange?: DateRange) {
         successful_jobs: successfulJobs,
         failed_jobs: failedJobs,
         running_jobs: runningJobs,
+        cancelled_jobs: cancelledJobs,
         success_rate: successRate,
       };
     },

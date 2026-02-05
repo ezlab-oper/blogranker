@@ -543,7 +543,7 @@ export default function Statistics() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                     <div className="text-center p-4 rounded-lg bg-muted/50">
                       <p className="text-2xl font-bold">{jobStats.total_jobs}</p>
                       <p className="text-sm text-muted-foreground">전체 작업</p>
@@ -555,6 +555,10 @@ export default function Statistics() {
                     <div className="text-center p-4 rounded-lg bg-amber-500/10">
                       <p className="text-2xl font-bold text-amber-600">{jobStats.running_jobs}</p>
                       <p className="text-sm text-muted-foreground">진행 중</p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-gray-500/10">
+                      <p className="text-2xl font-bold text-gray-600">{jobStats.cancelled_jobs}</p>
+                      <p className="text-sm text-muted-foreground">취소됨</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-destructive/10">
                       <p className="text-2xl font-bold text-destructive">{jobStats.failed_jobs}</p>
