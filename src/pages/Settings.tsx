@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Play, Calendar } from 'lucide-react';
+import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Calendar } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,7 @@ export default function Settings() {
   const [localSettings, setLocalSettings] = useState<AllSettings>(settings);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isTestingSchedule, setIsTestingSchedule] = useState(false);
+  
 
   // Sync local state with fetched settings
   useEffect(() => {
@@ -85,28 +85,6 @@ export default function Settings() {
     }
   };
 
-  const handleTestScheduledCrawl = async () => {
-    setIsTestingSchedule(true);
-    try {
-      const response = await supabase.functions.invoke('scheduled-crawl');
-      
-      if (response.error) throw response.error;
-      
-      toast({
-        title: '스케줄 수집 테스트 완료',
-        description: response.data?.message || '스케줄 수집이 정상적으로 실행되었습니다.',
-      });
-    } catch (error) {
-      console.error('Failed to test scheduled crawl:', error);
-      toast({
-        title: '테스트 실패',
-        description: '스케줄 수집 테스트 중 오류가 발생했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsTestingSchedule(false);
-    }
-  };
 
   // Calculate cron expression for display
   const cronExpression = timeToCronExpression(localSettings.schedule.time);
@@ -211,25 +189,6 @@ export default function Settings() {
               />
             </div>
             
-            {/* Test Button */}
-            <Button 
-              variant="outline" 
-              className="w-full gap-2"
-              onClick={handleTestScheduledCrawl}
-              disabled={isTestingSchedule}
-            >
-              {isTestingSchedule ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  테스트 실행 중...
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  스케줄 수집 테스트 실행
-                </>
-              )}
-            </Button>
           </CardContent>
         </Card>
 
