@@ -1,0 +1,185 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Power, PowerOff, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
+import { useKeywords, useUpdateKeyword, useDeleteKeyword } from '@/hooks/useKeywords';
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import type { Keyword, KeywordCategory } from '@/types/database';
+
+interface KeywordTableProps {
+  onEdit: (keyword: Keyword & { category: KeywordCategory | null }) => void;
+}
+
+export function KeywordTable({ onEdit }: KeywordTableProps) {
+  const { data: keywords, isLoading } = useKeywords();
+  const updateKeyword = useUpdateKeyword();
+  const deleteKeyword = useDeleteKeyword();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const handleToggleActive = (id: string, currentValue: boolean) => {
+    updateKeyword.mutate({ id, is_active: !currentValue });
+  };
+
+  const handleDelete = () => {
+    if (deleteTarget) {
+      deleteKeyword.mutate(deleteTarget);
+      setDeleteTarget(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-16 rounded-lg animate-shimmer" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!keywords || keywords.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <p>등록된 키워드가 없습니다.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="rounded-xl border bg-card shadow-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="w-12">상태</TableHead>
+              <TableHead>키워드</TableHead>
+              <TableHead>카테고리</TableHead>
+              <TableHead>등록일</TableHead>
+              <TableHead className="text-right w-20">작업</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <AnimatePresence>
+              {keywords.map((kw, index) => (
+                <motion.tr
+                  key={kw.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ delay: index * 0.02 }}
+                  className="group"
+                >
+                  <TableCell>
+                    <Switch
+                      checked={kw.is_active}
+                      onCheckedChange={() => handleToggleActive(kw.id, kw.is_active)}
+                      className="data-[state=checked]:bg-success"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {kw.is_active ? (
+                        <Power className="w-4 h-4 text-success" />
+                      ) : (
+                        <PowerOff className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      <span className="font-medium">{kw.keyword}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {kw.category ? (
+                      <Badge
+                        variant="secondary"
+                        style={{
+                          backgroundColor: `${kw.category.color}20`,
+                          color: kw.category.color,
+                          borderColor: `${kw.category.color}40`,
+                        }}
+                        className="border"
+                      >
+                        {kw.category.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {formatDistanceToNow(new Date(kw.created_at), { addSuffix: true, locale: ko })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEdit(kw)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          수정
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeleteTarget(kw.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          삭제
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </motion.tr>
+              ))}
+            </AnimatePresence>
+          </TableBody>
+        </Table>
+      </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>키워드를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 작업은 되돌릴 수 없습니다. 해당 키워드와 관련된 모든 수집 데이터가 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
