@@ -1,5 +1,20 @@
 import { supabase } from '@/integrations/supabase/client';
 
+// Utility function to generate random delay between min and max (in ms)
+function randomDelay(minMs: number, maxMs: number): number {
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+}
+
+// Shuffle array using Fisher-Yates algorithm
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 interface BlogResult {
   rank: number;
   title: string;
@@ -83,14 +98,17 @@ export async function runCrawlJob(
     return { success: false, error: 'Failed to fetch keywords or engines' };
   }
 
+  // Randomize the order of engines to vary the request pattern
+  const shuffledEngines = shuffleArray(engines);
+
   let processed = 0;
   let successful = 0;
   let failed = 0;
-  const totalOperations = keywords.length * engines.length;
+  const totalOperations = keywords.length * shuffledEngines.length;
 
   // Process each keyword for each engine
   for (const kw of keywords) {
-    for (const engine of engines) {
+    for (const engine of shuffledEngines) {
       try {
         const engineType = engine.name === '네이버' ? 'naver' : 'google';
         
@@ -155,7 +173,15 @@ export async function runCrawlJob(
         .eq('id', job.id);
 
       // Rate limiting - wait between requests
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // Randomize delay between 3-7 seconds to avoid pattern detection
+      const delay = randomDelay(3000, 7000);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    
+    // Additional random delay between keywords (1-3 seconds)
+    if (kw !== keywords[keywords.length - 1]) {
+      const interKeywordDelay = randomDelay(1000, 3000);
+      await new Promise((resolve) => setTimeout(resolve, interKeywordDelay));
     }
   }
 
