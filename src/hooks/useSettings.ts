@@ -92,6 +92,35 @@ export function useSettings() {
         if (error) throw error;
       }
 
+      // Manage cron job based on schedule settings
+      const jobName = 'scheduled-blog-crawl';
+      const cronExpression = timeToCronExpression(newSettings.schedule.time);
+      const projectUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      // First unschedule any existing job (ignore errors if it doesn't exist)
+      try {
+        await supabase.rpc('unschedule_cron_job' as never, { job_name: jobName });
+      } catch {
+        // Job might not exist
+      }
+
+      // Schedule new job if enabled
+      if (newSettings.schedule.enabled) {
+        try {
+          await supabase.rpc('schedule_cron_job' as never, {
+            job_name: jobName,
+            schedule: cronExpression,
+            function_url: `${projectUrl}/functions/v1/scheduled-crawl`,
+            auth_token: anonKey,
+          });
+          console.log(`Cron job scheduled: ${cronExpression} for ${projectUrl}/functions/v1/scheduled-crawl`);
+        } catch (error) {
+          console.error('Failed to schedule cron job:', error);
+          // Don't throw - the settings are still saved
+        }
+      }
+
       return newSettings;
     },
     onSuccess: () => {
