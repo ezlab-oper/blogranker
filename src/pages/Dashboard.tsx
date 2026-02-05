@@ -7,9 +7,10 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentResults } from '@/components/dashboard/RecentResults';
 import { KeywordOverview } from '@/components/dashboard/KeywordOverview';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useDashboardStats } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
-import { runCrawlJob } from '@/lib/api/scraper';
+import { runCrawlJob, CrawlProgress } from '@/lib/api/scraper';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCrawling, setIsCrawling] = useState(false);
+  const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
 
   const handleStartCrawl = async () => {
     const activeKeywords = keywords?.filter(k => k.is_active) || [];
@@ -34,6 +36,7 @@ export default function Dashboard() {
     }
 
     setIsCrawling(true);
+    setCrawlProgress(null);
 
     toast({
       title: '수집 시작',
@@ -41,7 +44,10 @@ export default function Dashboard() {
     });
 
     try {
-      const result = await runCrawlJob(activeKeywords.map(k => k.id));
+      const result = await runCrawlJob(
+        activeKeywords.map(k => k.id),
+        (progress) => setCrawlProgress(progress)
+      );
 
       if (result.success) {
         toast({
@@ -67,8 +73,13 @@ export default function Dashboard() {
       });
     } finally {
       setIsCrawling(false);
+      setCrawlProgress(null);
     }
   };
+
+  const progressPercent = crawlProgress 
+    ? Math.round((crawlProgress.processed / crawlProgress.total) * 100) 
+    : 0;
 
   return (
     <AppLayout>
@@ -103,6 +114,35 @@ export default function Dashboard() {
             )}
           </Button>
         </motion.div>
+
+        {/* Crawl Progress */}
+        {isCrawling && crawlProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card border rounded-lg p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span className="font-medium">
+                  수집 중: {crawlProgress.currentKeyword}
+                </span>
+                <span className="text-muted-foreground">
+                  ({crawlProgress.currentEngine})
+                </span>
+              </div>
+              <span className="text-muted-foreground">
+                {crawlProgress.processed} / {crawlProgress.total}
+              </span>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>성공: {crawlProgress.successful} | 실패: {crawlProgress.failed}</span>
+              <span>{progressPercent}%</span>
+            </div>
+          </motion.div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

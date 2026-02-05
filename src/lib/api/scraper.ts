@@ -19,6 +19,15 @@ interface ScrapeResponse {
   error?: string;
 }
 
+export interface CrawlProgress {
+  currentKeyword: string;
+  currentEngine: string;
+  processed: number;
+  total: number;
+  successful: number;
+  failed: number;
+}
+
 export async function scrapeKeyword(
   keyword: string,
   engine: 'naver' | 'google'
@@ -34,7 +43,10 @@ export async function scrapeKeyword(
   return data;
 }
 
-export async function runCrawlJob(keywordIds: string[]): Promise<{
+export async function runCrawlJob(
+  keywordIds: string[],
+  onProgress?: (progress: CrawlProgress) => void
+): Promise<{
   success: boolean;
   jobId?: string;
   error?: string;
@@ -74,12 +86,24 @@ export async function runCrawlJob(keywordIds: string[]): Promise<{
   let processed = 0;
   let successful = 0;
   let failed = 0;
+  const totalOperations = keywords.length * engines.length;
 
   // Process each keyword for each engine
   for (const kw of keywords) {
     for (const engine of engines) {
       try {
         const engineType = engine.name === '네이버' ? 'naver' : 'google';
+        
+        // Report progress before starting
+        onProgress?.({
+          currentKeyword: kw.keyword,
+          currentEngine: engine.name,
+          processed,
+          total: totalOperations,
+          successful,
+          failed,
+        });
+        
         const result = await scrapeKeyword(kw.keyword, engineType);
 
         if (result.success && result.results) {
@@ -109,6 +133,16 @@ export async function runCrawlJob(keywordIds: string[]): Promise<{
       }
 
       processed++;
+
+      // Report progress after completion
+      onProgress?.({
+        currentKeyword: kw.keyword,
+        currentEngine: engine.name,
+        processed,
+        total: totalOperations,
+        successful,
+        failed,
+      });
 
       // Update job progress
       await supabase
