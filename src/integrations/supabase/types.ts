@@ -349,6 +349,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      schedule_cron_job: {
+        Args: {
+          auth_token: string
+          function_url: string
+          job_name: string
+          schedule: string
+        }
+        Returns: number
+      }
+      unschedule_cron_job: { Args: { job_name: string }; Returns: boolean }
     }
     Enums: {
       app_role: "master" | "admin" | "viewer"
