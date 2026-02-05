@@ -52,7 +52,6 @@ export function useAdminManagement() {
       role: AppRole;
       displayName?: string;
     }) => {
-      // Use edge function to create admin (requires service role)
       const { data, error } = await supabase.functions.invoke('create-admin', {
         body: { email, password, role, displayName },
       });
@@ -71,29 +70,40 @@ export function useAdminManagement() {
     },
   });
 
-  // Update admin role
-  const updateAdminRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role })
-        .eq('user_id', userId);
+  // Update admin (displayName, role, password)
+  const updateAdmin = useMutation({
+    mutationFn: async ({
+      userId,
+      displayName,
+      role,
+      password,
+    }: {
+      userId: string;
+      displayName?: string;
+      role?: AppRole;
+      password?: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('update-admin', {
+        body: { userId, displayName, role, password },
+      });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] });
-      toast.success('관리자 역할이 변경되었습니다.');
+      toast.success('관리자 정보가 수정되었습니다.');
     },
     onError: (error: Error) => {
-      toast.error(`역할 변경 실패: ${error.message}`);
+      toast.error(`관리자 수정 실패: ${error.message}`);
     },
   });
 
   // Delete admin
   const deleteAdmin = useMutation({
     mutationFn: async (userId: string) => {
-      // Use edge function to delete admin (requires service role)
       const { data, error } = await supabase.functions.invoke('delete-admin', {
         body: { userId },
       });
@@ -117,7 +127,7 @@ export function useAdminManagement() {
     isLoading,
     error,
     createAdmin,
-    updateAdminRole,
+    updateAdmin,
     deleteAdmin,
   };
 }

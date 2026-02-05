@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import { useAuth } from '@/contexts/AuthContext';
-import { AppRole, ROLE_PERMISSIONS } from '@/types/auth';
+import { AppRole, AdminUser, ROLE_PERMISSIONS } from '@/types/auth';
 import { UserPlus, Trash2, Edit, Loader2, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -23,29 +23,57 @@ const roleColors: Record<AppRole, string> = {
 };
 
 export default function AdminManagement() {
-  const { admins, isLoading, createAdmin, updateAdminRole, deleteAdmin } = useAdminManagement();
+  const { admins, isLoading, createAdmin, updateAdmin, deleteAdmin } = useAdminManagement();
   const { user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
   
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState<AppRole>('admin');
+  // Create form state
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createDisplayName, setCreateDisplayName] = useState('');
+  const [createRole, setCreateRole] = useState<AppRole>('admin');
+
+  // Edit form state
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editRole, setEditRole] = useState<AppRole>('admin');
+  const [editPassword, setEditPassword] = useState('');
 
   const handleCreate = async () => {
-    await createAdmin.mutateAsync({ email, password, role, displayName: displayName || undefined });
+    await createAdmin.mutateAsync({ 
+      email: createEmail, 
+      password: createPassword, 
+      role: createRole, 
+      displayName: createDisplayName || undefined 
+    });
     setIsCreateOpen(false);
-    setEmail('');
-    setPassword('');
-    setDisplayName('');
-    setRole('admin');
+    setCreateEmail('');
+    setCreatePassword('');
+    setCreateDisplayName('');
+    setCreateRole('admin');
   };
 
-  const handleUpdateRole = async (userId: string, newRole: AppRole) => {
-    await updateAdminRole.mutateAsync({ userId, role: newRole });
-    setEditingUser(null);
+  const openEditDialog = (admin: AdminUser) => {
+    setEditingAdmin(admin);
+    setEditDisplayName(admin.display_name || '');
+    setEditRole(admin.role);
+    setEditPassword('');
+  };
+
+  const handleUpdate = async () => {
+    if (!editingAdmin) return;
+    
+    await updateAdmin.mutateAsync({
+      userId: editingAdmin.id,
+      displayName: editDisplayName,
+      role: editRole,
+      password: editPassword || undefined,
+    });
+    
+    setEditingAdmin(null);
+    setEditDisplayName('');
+    setEditRole('admin');
+    setEditPassword('');
   };
 
   const handleDelete = async (userId: string) => {
@@ -63,6 +91,8 @@ export default function AdminManagement() {
               시스템 관리자를 추가하고 관리합니다
             </p>
           </div>
+          
+          {/* Create Dialog */}
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -84,8 +114,8 @@ export default function AdminManagement() {
                     id="create-email"
                     type="email"
                     placeholder="admin@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={createEmail}
+                    onChange={(e) => setCreateEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -94,8 +124,8 @@ export default function AdminManagement() {
                     id="create-password"
                     type="password"
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={createPassword}
+                    onChange={(e) => setCreatePassword(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -103,13 +133,13 @@ export default function AdminManagement() {
                   <Input
                     id="create-name"
                     placeholder="관리자 이름"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    value={createDisplayName}
+                    onChange={(e) => setCreateDisplayName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>역할 *</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+                  <Select value={createRole} onValueChange={(v) => setCreateRole(v as AppRole)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -123,7 +153,7 @@ export default function AdminManagement() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    {ROLE_PERMISSIONS[role].description}
+                    {ROLE_PERMISSIONS[createRole].description}
                   </p>
                 </div>
               </div>
@@ -133,7 +163,7 @@ export default function AdminManagement() {
                 </Button>
                 <Button
                   onClick={handleCreate}
-                  disabled={!email || !password || createAdmin.isPending}
+                  disabled={!createEmail || !createPassword || createAdmin.isPending}
                 >
                   {createAdmin.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -144,6 +174,78 @@ export default function AdminManagement() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editingAdmin} onOpenChange={(open) => !open && setEditingAdmin(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>관리자 수정</DialogTitle>
+              <DialogDescription>
+                {editingAdmin?.email} 관리자 정보를 수정합니다.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">표시 이름</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="관리자 이름"
+                  value={editDisplayName}
+                  onChange={(e) => setEditDisplayName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>역할</Label>
+                <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="master">
+                      {ROLE_PERMISSIONS.master.label}
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      {ROLE_PERMISSIONS.admin.label}
+                    </SelectItem>
+                    <SelectItem value="viewer">
+                      {ROLE_PERMISSIONS.viewer.label}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {ROLE_PERMISSIONS[editRole].description}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-password">새 비밀번호</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  placeholder="변경하지 않으려면 비워두세요"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  비밀번호를 변경하지 않으려면 비워두세요.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingAdmin(null)}>
+                취소
+              </Button>
+              <Button
+                onClick={handleUpdate}
+                disabled={updateAdmin.isPending}
+              >
+                {updateAdmin.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                저장
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Admin List */}
         <Card>
@@ -182,25 +284,9 @@ export default function AdminManagement() {
                       <TableCell className="font-medium">{admin.email}</TableCell>
                       <TableCell>{admin.display_name || '-'}</TableCell>
                       <TableCell>
-                        {editingUser === admin.id ? (
-                          <Select
-                            value={admin.role}
-                            onValueChange={(v) => handleUpdateRole(admin.id, v as AppRole)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="master">최고 관리자</SelectItem>
-                              <SelectItem value="admin">일반 관리자</SelectItem>
-                              <SelectItem value="viewer">뷰어 관리자</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant="outline" className={roleColors[admin.role]}>
-                            {ROLE_PERMISSIONS[admin.role].label}
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className={roleColors[admin.role]}>
+                          {ROLE_PERMISSIONS[admin.role].label}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {format(new Date(admin.created_at), 'yyyy.MM.dd', { locale: ko })}
@@ -211,7 +297,7 @@ export default function AdminManagement() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setEditingUser(editingUser === admin.id ? null : admin.id)}
+                              onClick={() => openEditDialog(admin)}
                             >
                               <Edit className="w-4 h-4" />
                             </Button>
