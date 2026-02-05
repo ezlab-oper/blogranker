@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Play, Calendar } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useSettings, type AllSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,12 +25,13 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
-  const { settings, isLoading, updateSettings, isUpdating } = useSettings();
+  const { settings, isLoading, updateSettings, isUpdating, timeToCronExpression } = useSettings();
   const { toast } = useToast();
   
   const [localSettings, setLocalSettings] = useState<AllSettings>(settings);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isTestingSchedule, setIsTestingSchedule] = useState(false);
 
   // Sync local state with fetched settings
   useEffect(() => {
@@ -80,6 +82,32 @@ export default function Settings() {
     }
   };
 
+  const handleTestScheduledCrawl = async () => {
+    setIsTestingSchedule(true);
+    try {
+      const response = await supabase.functions.invoke('scheduled-crawl');
+      
+      if (response.error) throw response.error;
+      
+      toast({
+        title: '스케줄 수집 테스트 완료',
+        description: response.data?.message || '스케줄 수집이 정상적으로 실행되었습니다.',
+      });
+    } catch (error) {
+      console.error('Failed to test scheduled crawl:', error);
+      toast({
+        title: '테스트 실패',
+        description: '스케줄 수집 테스트 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTestingSchedule(false);
+    }
+  };
+
+  // Calculate cron expression for display
+  const cronExpression = timeToCronExpression(localSettings.schedule.time);
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -110,13 +138,33 @@ export default function Settings() {
         {/* Schedule Settings */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5" />
-              스케줄 설정
-            </CardTitle>
-            <CardDescription>자동 수집 시간을 설정합니다</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  스케줄 설정
+                </CardTitle>
+                <CardDescription>자동 수집 시간을 설정합니다</CardDescription>
+              </div>
+              <Badge variant={localSettings.schedule.enabled ? 'default' : 'secondary'}>
+                {localSettings.schedule.enabled ? '활성화됨' : '비활성화됨'}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Cron Expression Display */}
+            {localSettings.schedule.enabled && (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Cron: <code className="px-1 py-0.5 bg-background rounded text-xs">{cronExpression}</code>
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  (매일 {localSettings.schedule.time} KST 실행)
+                </span>
+              </div>
+            )}
+            
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="schedule-time">수집 시간 (KST)</Label>
@@ -159,6 +207,26 @@ export default function Settings() {
                 className="data-[state=checked]:bg-success" 
               />
             </div>
+            
+            {/* Test Button */}
+            <Button 
+              variant="outline" 
+              className="w-full gap-2"
+              onClick={handleTestScheduledCrawl}
+              disabled={isTestingSchedule}
+            >
+              {isTestingSchedule ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  테스트 실행 중...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  스케줄 수집 테스트 실행
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 
