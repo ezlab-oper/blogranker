@@ -22,27 +22,21 @@ serve(async (req) => {
       },
     });
 
-    // Check if any master already exists
-    const { data: existingMasters, error: checkError } = await supabaseAdmin
-      .from("user_roles")
-      .select("*")
-      .eq("role", "master");
+    const { userId, email, password, displayName, deleteOnly } = await req.json();
 
-    if (checkError) {
-      return new Response(
-        JSON.stringify({ error: checkError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Delete existing user if userId provided
+    if (userId) {
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+      await supabaseAdmin.from("profiles").delete().eq("user_id", userId);
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+      
+      if (deleteOnly) {
+        return new Response(
+          JSON.stringify({ success: true, message: "User deleted" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
-
-    if (existingMasters && existingMasters.length > 0) {
-      return new Response(
-        JSON.stringify({ error: "Master admin already exists" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { email, password, displayName } = await req.json();
 
     if (!email || !password) {
       return new Response(
