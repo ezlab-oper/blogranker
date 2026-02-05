@@ -13,6 +13,7 @@ interface AuthContextType {
   canAccessSettings: boolean;
   canManageAdmins: boolean;
   canUseFeatures: boolean;
+  canPerformActions: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -102,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     canAccessSettings: false,
     canManageAdmins: false,
     canUseFeatures: false,
+    canPerformActions: false,
   };
 
   return (
