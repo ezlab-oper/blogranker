@@ -66,12 +66,20 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
 
+  // Sort: Naver first, then by rank ascending (1→10)
+  const sortedResults = results ? [...results].sort((a, b) => {
+    const aIsNaver = a.search_engine?.name === '네이버' ? 0 : 1;
+    const bIsNaver = b.search_engine?.name === '네이버' ? 0 : 1;
+    if (aIsNaver !== bIsNaver) return aIsNaver - bIsNaver;
+    return a.rank - b.rank;
+  }) : undefined;
+
   // Pagination logic
-  const totalItems = results?.length || 0;
+  const totalItems = sortedResults?.length || 0;
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedResults = results?.slice(startIndex, endIndex);
+  const paginatedResults = sortedResults?.slice(startIndex, endIndex);
 
   // Reset to first page when filters change
   const handleFilterChange = (newFilters: typeof filters) => {
