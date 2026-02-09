@@ -103,8 +103,6 @@ export function KeywordTable({ keywords, isLoading, onEdit, readonly = false, se
               <>
                 <TableHead className="text-right">PC 검색수</TableHead>
                 <TableHead className="text-right">모바일 검색수</TableHead>
-                <TableHead className="text-right">PC 클릭수</TableHead>
-                <TableHead className="text-right">모바일 클릭수</TableHead>
                 <TableHead className="text-center">경쟁정도</TableHead>
                 <TableHead>조회일시</TableHead>
               </>
@@ -119,8 +117,6 @@ export function KeywordTable({ keywords, isLoading, onEdit, readonly = false, se
                 const volume = searchVolumeData?.[kw.keyword.toLowerCase()];
                 const pcCount = volume?.monthlyPcQcCnt;
                 const mobileCount = volume?.monthlyMobileQcCnt;
-                const pcClick = volume?.monthlyAvePcClkCnt;
-                const mobileClick = volume?.monthlyAveMobileClkCnt;
                 const compIdx = volume?.compIdx;
 
                 return (
@@ -178,12 +174,6 @@ export function KeywordTable({ keywords, isLoading, onEdit, readonly = false, se
                         <TableCell className="text-right tabular-nums">
                           {formatCount(mobileCount)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {pcClick !== undefined ? pcClick.toFixed(1) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {mobileClick !== undefined ? mobileClick.toFixed(1) : '-'}
-                        </TableCell>
                         <TableCell className="text-center">
                           {compIdx ? (
                             <Badge
@@ -201,7 +191,12 @@ export function KeywordTable({ keywords, isLoading, onEdit, readonly = false, se
                           ) : '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                          {fetchedAt ? format(fetchedAt, 'yyyy-MM-dd HH:mm:ss') : '-'}
+                          {fetchedAt ? (
+                            <div className="leading-tight">
+                              <div>{format(fetchedAt, 'yyyy-MM-dd')}</div>
+                              <div className="text-xs">{format(fetchedAt, 'HH:mm:ss')}</div>
+                            </div>
+                          ) : '-'}
                         </TableCell>
                       </>
                     )}
