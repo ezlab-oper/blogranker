@@ -1,6 +1,4 @@
-import { Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 
 const PROGRAMS = ['전체(합산)', '이지캡쳐', '이지집', '이지메모', '이지파인더', '이지캠', '이지리더'] as const;
@@ -12,7 +10,6 @@ interface KeywordFilterBarProps {
   selectedCategories: string[];
   onProgramChange: (programs: string[]) => void;
   onCategoryChange: (categories: string[]) => void;
-  onSearch: () => void;
 }
 
 export function KeywordFilterBar({
@@ -20,7 +17,6 @@ export function KeywordFilterBar({
   selectedCategories,
   onProgramChange,
   onCategoryChange,
-  onSearch,
 }: KeywordFilterBarProps) {
   const toggleItem = (list: string[], item: string, setter: (v: string[]) => void) => {
     setter(list.includes(item) ? list.filter(i => i !== item) : [...list, item]);
@@ -59,14 +55,6 @@ export function KeywordFilterBar({
               </Label>
             ))}
           </div>
-        </div>
-
-        {/* 조회 버튼 */}
-        <div className="flex items-end">
-          <Button onClick={onSearch} className="gap-2">
-            <Search className="w-4 h-4" />
-            조회
-          </Button>
         </div>
       </div>
     </div>

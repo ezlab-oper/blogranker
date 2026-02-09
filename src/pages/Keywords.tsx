@@ -48,10 +48,12 @@ export default function Keywords() {
     fetchSearchVolume(keywordStrings);
   };
 
-  const handleFilterSearch = () => {
-    // TODO: 필터 적용 로직 (프로그램/카테고리 기반 키워드 필터링)
-    console.log('Filter search:', { selectedPrograms, selectedCategories });
-  };
+  // 필터링된 키워드 목록
+  const filteredKeywords = keywords?.filter(kw => {
+    const programMatch = selectedPrograms.length === 0 || selectedPrograms.includes(kw.program || '');
+    const categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(kw.category?.name || '');
+    return programMatch && categoryMatch;
+  }) ?? [];
 
   return (
     <AppLayout>
@@ -99,7 +101,6 @@ export default function Keywords() {
           selectedCategories={selectedCategories}
           onProgramChange={setSelectedPrograms}
           onCategoryChange={setSelectedCategories}
-          onSearch={handleFilterSearch}
         />
 
         {/* Search */}
@@ -112,6 +113,8 @@ export default function Keywords() {
 
         {/* Table */}
         <KeywordTable
+          keywords={filteredKeywords}
+          isLoading={!keywords}
           onEdit={handleEdit}
           readonly={!canPerformActions}
           searchVolumeData={searchVolumeData}
