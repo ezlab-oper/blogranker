@@ -48,11 +48,16 @@ export function useKeywordSearchVolume() {
 
       // Map by keyword (exact match)
       const volumeMap: Record<string, KeywordSearchVolume> = {};
-      const lowerKeywords = keywords.map(k => k.toLowerCase());
+      // Normalize: remove spaces and lowercase for matching
+      const normalize = (s: string) => s.replace(/\s+/g, '').toLowerCase();
+      const normalizedKeywords = keywords.map(k => normalize(k));
 
       for (const item of allResults) {
-        if (lowerKeywords.includes(item.relKeyword.toLowerCase())) {
-          volumeMap[item.relKeyword.toLowerCase()] = item;
+        const normalizedRel = normalize(item.relKeyword);
+        // Match against original keywords (normalized)
+        const matchIndex = normalizedKeywords.indexOf(normalizedRel);
+        if (matchIndex !== -1) {
+          volumeMap[keywords[matchIndex].toLowerCase()] = item;
         }
       }
 

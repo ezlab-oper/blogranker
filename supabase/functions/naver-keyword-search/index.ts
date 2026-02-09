@@ -83,14 +83,14 @@ serve(async (req) => {
 
     const signature = await generateSignatureAsync(timestamp, method, uri, SECRET_KEY);
 
-    // Build query params - join keywords with comma
-    const hintKeywords = keywords.join(",");
-    const params = new URLSearchParams({
-      hintKeywords,
-      showDetail: "1",
-    });
+    // Naver API doesn't accept spaces in keywords - remove them
+    const cleanedKeywords = keywords.map((k: string) => k.replace(/\s+/g, ""));
+    const encodedKeywords = cleanedKeywords.map((k: string) => encodeURIComponent(k)).join(",");
+    const queryString = `hintKeywords=${encodedKeywords}&showDetail=1`;
 
-    const response = await fetch(`${BASE_URL}${uri}?${params.toString()}`, {
+    console.log("Final URL:", `${BASE_URL}${uri}?${queryString}`);
+
+    const response = await fetch(`${BASE_URL}${uri}?${queryString}`, {
       method: "GET",
       headers: {
         "X-Timestamp": timestamp,
