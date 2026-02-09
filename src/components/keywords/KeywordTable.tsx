@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Power, PowerOff, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import {
@@ -39,6 +40,7 @@ interface KeywordTableProps {
   onEdit: (keyword: Keyword & { category: KeywordCategory | null }) => void;
   readonly?: boolean;
   searchVolumeData?: Record<string, KeywordSearchVolume>;
+  fetchedAt?: Date | null;
 }
 
 function formatCount(value: number | string | undefined): string {
@@ -49,7 +51,7 @@ function formatCount(value: number | string | undefined): string {
   return num.toLocaleString();
 }
 
-export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: KeywordTableProps) {
+export function KeywordTable({ onEdit, readonly = false, searchVolumeData, fetchedAt }: KeywordTableProps) {
   const { data: keywords, isLoading } = useKeywords();
   const updateKeyword = useUpdateKeyword();
   const deleteKeyword = useDeleteKeyword();
@@ -102,6 +104,7 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: Key
                   <TableHead className="text-right">PC 클릭수</TableHead>
                   <TableHead className="text-right">모바일 클릭수</TableHead>
                   <TableHead className="text-center">경쟁정도</TableHead>
+                  <TableHead>조회일시</TableHead>
                 </>
               )}
               <TableHead>등록일</TableHead>
@@ -182,6 +185,9 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: Key
                               {compIdx}
                             </Badge>
                           ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                          {fetchedAt ? format(fetchedAt, 'yyyy-MM-dd HH:mm:ss') : '-'}
                         </TableCell>
                       </>
                     )}

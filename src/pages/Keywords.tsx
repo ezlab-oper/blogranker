@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, BarChart3, Loader2 } from 'lucide-react';
+import { Plus, BarChart3, Loader2, Search } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { KeywordTable } from '@/components/keywords/KeywordTable';
 import { KeywordDialog } from '@/components/keywords/KeywordDialog';
+import { KeywordFilterBar } from '@/components/keywords/KeywordFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApiTracking } from '@/hooks/useApiTracking';
@@ -16,10 +17,12 @@ export default function Keywords() {
   useApiTracking('keywords');
   const { canPerformActions } = useAuth();
   const { data: keywords } = useKeywords();
-  const { data: searchVolumeData, isLoading: isLoadingVolume, fetchSearchVolume } = useKeywordSearchVolume();
-  
+  const { data: searchVolumeData, isLoading: isLoadingVolume, fetchedAt, fetchSearchVolume } = useKeywordSearchVolume();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
+  const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   const handleEdit = (keyword: Keyword & { category: KeywordCategory | null }) => {
     setEditData(keyword);
@@ -28,15 +31,18 @@ export default function Keywords() {
 
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
-    if (!open) {
-      setEditData(null);
-    }
+    if (!open) setEditData(null);
   };
 
   const handleFetchSearchVolume = () => {
     if (!keywords || keywords.length === 0) return;
     const keywordStrings = keywords.map(kw => kw.keyword);
     fetchSearchVolume(keywordStrings);
+  };
+
+  const handleFilterSearch = () => {
+    // TODO: 필터 적용 로직 (프로그램/카테고리 기반 키워드 필터링)
+    console.log('Filter search:', { selectedPrograms, selectedCategories });
   };
 
   return (
@@ -68,8 +74,8 @@ export default function Keywords() {
               )}
               검색량 조회
             </Button>
-            <Button 
-              onClick={() => setDialogOpen(true)} 
+            <Button
+              onClick={() => setDialogOpen(true)}
               className="gradient-primary text-white gap-2"
               disabled={!canPerformActions}
             >
@@ -79,7 +85,16 @@ export default function Keywords() {
           </div>
         </motion.div>
 
-        {/* Search (placeholder for future) */}
+        {/* Filter Bar */}
+        <KeywordFilterBar
+          selectedPrograms={selectedPrograms}
+          selectedCategories={selectedCategories}
+          onProgramChange={setSelectedPrograms}
+          onCategoryChange={setSelectedCategories}
+          onSearch={handleFilterSearch}
+        />
+
+        {/* Search */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -92,6 +107,7 @@ export default function Keywords() {
           onEdit={handleEdit}
           readonly={!canPerformActions}
           searchVolumeData={searchVolumeData}
+          fetchedAt={fetchedAt}
         />
 
         {/* Dialog */}
