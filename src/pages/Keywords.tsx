@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, BarChart3, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { KeywordTable } from '@/components/keywords/KeywordTable';
 import { KeywordDialog } from '@/components/keywords/KeywordDialog';
@@ -8,11 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useApiTracking } from '@/hooks/useApiTracking';
 import { useAuth } from '@/contexts/AuthContext';
+import { useKeywords } from '@/hooks/useKeywords';
+import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import type { Keyword, KeywordCategory } from '@/types/database';
 
 export default function Keywords() {
   useApiTracking('keywords');
   const { canPerformActions } = useAuth();
+  const { data: keywords } = useKeywords();
+  const { data: searchVolumeData, isLoading: isLoadingVolume, fetchSearchVolume } = useKeywordSearchVolume();
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
@@ -27,6 +31,12 @@ export default function Keywords() {
     if (!open) {
       setEditData(null);
     }
+  };
+
+  const handleFetchSearchVolume = () => {
+    if (!keywords || keywords.length === 0) return;
+    const keywordStrings = keywords.map(kw => kw.keyword);
+    fetchSearchVolume(keywordStrings);
   };
 
   return (
@@ -44,14 +54,29 @@ export default function Keywords() {
               추적할 키워드를 등록하고 관리하세요
             </p>
           </div>
-          <Button 
-            onClick={() => setDialogOpen(true)} 
-            className="gradient-primary text-white gap-2"
-            disabled={!canPerformActions}
-          >
-            <Plus className="w-4 h-4" />
-            키워드 추가
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleFetchSearchVolume}
+              variant="outline"
+              className="gap-2"
+              disabled={isLoadingVolume || !keywords || keywords.length === 0}
+            >
+              {isLoadingVolume ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <BarChart3 className="w-4 h-4" />
+              )}
+              검색량 조회
+            </Button>
+            <Button 
+              onClick={() => setDialogOpen(true)} 
+              className="gradient-primary text-white gap-2"
+              disabled={!canPerformActions}
+            >
+              <Plus className="w-4 h-4" />
+              키워드 추가
+            </Button>
+          </div>
         </motion.div>
 
         {/* Search (placeholder for future) */}
@@ -63,7 +88,11 @@ export default function Keywords() {
         </div>
 
         {/* Table */}
-        <KeywordTable onEdit={handleEdit} readonly={!canPerformActions} />
+        <KeywordTable
+          onEdit={handleEdit}
+          readonly={!canPerformActions}
+          searchVolumeData={searchVolumeData}
+        />
 
         {/* Dialog */}
         <KeywordDialog open={dialogOpen} onOpenChange={handleDialogClose} editData={editData} />

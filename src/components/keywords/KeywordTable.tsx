@@ -33,13 +33,23 @@ import { useKeywords, useUpdateKeyword, useDeleteKeyword } from '@/hooks/useKeyw
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Keyword, KeywordCategory } from '@/types/database';
+import type { KeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 
 interface KeywordTableProps {
   onEdit: (keyword: Keyword & { category: KeywordCategory | null }) => void;
   readonly?: boolean;
+  searchVolumeData?: Record<string, KeywordSearchVolume>;
 }
 
-export function KeywordTable({ onEdit, readonly = false }: KeywordTableProps) {
+function formatCount(value: number | string | undefined): string {
+  if (value === undefined || value === null) return '-';
+  if (typeof value === 'string' && value === '< 10') return '< 10';
+  const num = typeof value === 'string' ? parseInt(value, 10) : value;
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString();
+}
+
+export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: KeywordTableProps) {
   const { data: keywords, isLoading } = useKeywords();
   const updateKeyword = useUpdateKeyword();
   const deleteKeyword = useDeleteKeyword();
@@ -55,6 +65,8 @@ export function KeywordTable({ onEdit, readonly = false }: KeywordTableProps) {
       setDeleteTarget(null);
     }
   };
+
+  const hasVolumeData = searchVolumeData && Object.keys(searchVolumeData).length > 0;
 
   if (isLoading) {
     return (
@@ -83,86 +95,116 @@ export function KeywordTable({ onEdit, readonly = false }: KeywordTableProps) {
               <TableHead className="w-12">상태</TableHead>
               <TableHead>키워드</TableHead>
               <TableHead>카테고리</TableHead>
+              {hasVolumeData && (
+                <>
+                  <TableHead className="text-right">PC 검색량</TableHead>
+                  <TableHead className="text-right">모바일 검색량</TableHead>
+                  <TableHead className="text-right">합계</TableHead>
+                </>
+              )}
               <TableHead>등록일</TableHead>
               <TableHead className="text-right w-20">작업</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <AnimatePresence>
-              {keywords.map((kw, index) => (
-                <motion.tr
-                  key={kw.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ delay: index * 0.02 }}
-                  className="group"
-                >
-                                  <TableCell>
-                                    <Switch
-                                      checked={kw.is_active}
-                                      onCheckedChange={() => handleToggleActive(kw.id, kw.is_active)}
-                                      className="data-[state=checked]:bg-success"
-                                      disabled={readonly}
-                                    />
-                                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {kw.is_active ? (
-                        <Power className="w-4 h-4 text-success" />
+              {keywords.map((kw, index) => {
+                const volume = searchVolumeData?.[kw.keyword.toLowerCase()];
+                const pcCount = volume?.monthlyPcQcCnt;
+                const mobileCount = volume?.monthlyMobileQcCnt;
+                const total = pcCount !== undefined && mobileCount !== undefined
+                  && typeof pcCount === 'number' && typeof mobileCount === 'number'
+                  ? pcCount + mobileCount
+                  : undefined;
+
+                return (
+                  <motion.tr
+                    key={kw.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ delay: index * 0.02 }}
+                    className="group"
+                  >
+                    <TableCell>
+                      <Switch
+                        checked={kw.is_active}
+                        onCheckedChange={() => handleToggleActive(kw.id, kw.is_active)}
+                        className="data-[state=checked]:bg-success"
+                        disabled={readonly}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {kw.is_active ? (
+                          <Power className="w-4 h-4 text-success" />
+                        ) : (
+                          <PowerOff className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span className="font-medium">{kw.keyword}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {kw.category ? (
+                        <Badge
+                          variant="secondary"
+                          style={{
+                            backgroundColor: `${kw.category.color}20`,
+                            color: kw.category.color,
+                            borderColor: `${kw.category.color}40`,
+                          }}
+                          className="border"
+                        >
+                          {kw.category.name}
+                        </Badge>
                       ) : (
-                        <PowerOff className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground text-sm">-</span>
                       )}
-                      <span className="font-medium">{kw.keyword}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {kw.category ? (
-                      <Badge
-                        variant="secondary"
-                        style={{
-                          backgroundColor: `${kw.category.color}20`,
-                          color: kw.category.color,
-                          borderColor: `${kw.category.color}40`,
-                        }}
-                        className="border"
-                      >
-                        {kw.category.name}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
+                    </TableCell>
+                    {hasVolumeData && (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCount(pcCount)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCount(mobileCount)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-semibold">
+                          {total !== undefined ? total.toLocaleString() : '-'}
+                        </TableCell>
+                      </>
                     )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatDistanceToNow(new Date(kw.created_at), { addSuffix: true, locale: ko })}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {!readonly && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEdit(kw)}>
-                            <Pencil className="w-4 h-4 mr-2" />
-                            수정
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setDeleteTarget(kw.id)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            삭제
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </motion.tr>
-              ))}
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatDistanceToNow(new Date(kw.created_at), { addSuffix: true, locale: ko })}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!readonly && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onEdit(kw)}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              수정
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget(kw.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              삭제
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                  </motion.tr>
+                );
+              })}
             </AnimatePresence>
           </TableBody>
         </Table>
