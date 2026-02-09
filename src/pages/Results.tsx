@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Loader2, Square } from 'lucide-react';
+import { Play, Loader2, Square, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ResultsTable } from '@/components/results/ResultsTable';
@@ -11,6 +11,8 @@ import { useKeywords } from '@/hooks/useKeywords';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { runCrawlJob, cancelCrawlJob, CrawlProgress } from '@/lib/api/scraper';
+import { useSyncBlogUrls } from '@/hooks/useBlogUrls';
+import { cn } from '@/lib/utils';
 
 export default function Results() {
   useApiTracking('results');
@@ -20,6 +22,7 @@ export default function Results() {
   const queryClient = useQueryClient();
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
+  const syncBlogUrls = useSyncBlogUrls();
 
   // Lifted filter state shared with ResultsTable
   const [selectedProgram, setSelectedProgram] = useState('');
@@ -97,24 +100,35 @@ export default function Results() {
               키워드별 블로그 노출 현황을 확인하세요
             </p>
           </div>
-          <Button
-            className="gradient-primary text-white gap-2"
-            onClick={handleStartCrawl}
-            disabled={isCrawling || !canPerformActions}
-            title={`수집 대상: ${crawlLabel}`}
-          >
-            {isCrawling ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                수집 중...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                수집 시작 ({crawlLabel})
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => syncBlogUrls.mutate()}
+              disabled={syncBlogUrls.isPending}
+            >
+              <RefreshCw className={cn("w-4 h-4", syncBlogUrls.isPending && "animate-spin")} />
+              URL 동기화
+            </Button>
+            <Button
+              className="gradient-primary text-white gap-2"
+              onClick={handleStartCrawl}
+              disabled={isCrawling || !canPerformActions}
+              title={`수집 대상: ${crawlLabel}`}
+            >
+              {isCrawling ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  수집 중...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  수집 시작 ({crawlLabel})
+                </>
+              )}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Crawl Progress */}
