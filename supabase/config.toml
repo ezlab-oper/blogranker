@@ -2,3 +2,6 @@ project_id = "ezmpngkjwgtebtswygrj"
 
 [functions.update-cron-schedule]
 verify_jwt = false
+
+[functions.naver-keyword-search]
+verify_jwt = false
