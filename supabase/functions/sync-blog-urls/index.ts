@@ -80,8 +80,6 @@ async function createJWT(email: string, privateKeyPem: string): Promise<string> 
     .replace(/-+END PRIVATE KEY-+/g, '')
     .replace(/[\s\r\n]/g, '');
   
-  console.log('PEM body length:', pemBody.length);
-  console.log('PEM body first 20 chars:', pemBody.substring(0, 20));
   
   // Use Deno's built-in base64 decoding
   const raw = atob(pemBody);
