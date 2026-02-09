@@ -217,7 +217,7 @@ export function KeywordDialog({ open, onOpenChange, editData }: KeywordDialogPro
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">프로그램 없음</SelectItem>
-                          {PROGRAMS.filter(p => p !== '전체(합산)').map((prog) => (
+                          {PROGRAMS.map((prog) => (
                             <SelectItem key={prog} value={prog}>{prog}</SelectItem>
                           ))}
                         </SelectContent>

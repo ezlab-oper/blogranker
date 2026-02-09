@@ -192,7 +192,7 @@ export function ResultsTable({
           </SelectTrigger>
           <SelectContent className="bg-popover">
             <SelectItem value="all">전체 프로그램</SelectItem>
-            {PROGRAMS.filter(p => p !== '전체(합산)').map((prog) => (
+            {PROGRAMS.map((prog) => (
               <SelectItem key={prog} value={prog}>{prog}</SelectItem>
             ))}
           </SelectContent>
@@ -375,9 +375,9 @@ export function ResultsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Calendar className="w-3 h-3" />
-                      {format(new Date(result.crawled_at), 'MM/dd HH:mm', { locale: ko })}
+                    <div className="text-sm text-muted-foreground leading-tight">
+                      <div>{format(new Date(result.crawled_at), 'yyyy-MM-dd')}</div>
+                      <div className="text-xs">{format(new Date(result.crawled_at), 'HH:mm:ss')}</div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -396,9 +396,10 @@ export function ResultsTable({
           </Table>
         </div>
       ) : (
-        <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border shadow-card">
-          <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>수집된 결과가 없습니다.</p>
+        <div className="text-center py-16 text-muted-foreground bg-card rounded-xl border shadow-card">
+          <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
+          <p className="text-lg font-medium mb-1">수집된 결과가 없습니다</p>
+          <p className="text-sm">상단의 프로그램과 키워드를 선택한 후 '수집 시작' 버튼을 눌러주세요</p>
         </div>
       )}
 
