@@ -1,9 +1,9 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
-const PROGRAMS = ['전체(합산)', '이지캡쳐', '이지집', '이지메모', '이지파인더', '이지캠', '이지리더'] as const;
+const PROGRAMS = ['이지캡쳐', '이지집', '이지메모', '이지파인더', '이지캠', '이지리더'] as const;
 export { PROGRAMS };
-const CATEGORIES = ['전체(합산)', '브랜드', '기능', '경쟁사'] as const;
+const CATEGORIES = ['브랜드', '기능', '경쟁사'] as const;
 
 interface KeywordFilterBarProps {
   selectedPrograms: string[];
