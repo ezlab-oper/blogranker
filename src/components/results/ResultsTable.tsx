@@ -51,22 +51,30 @@ function getEngineBadge(name: string) {
 
 interface ResultsTableProps {
   onExportReady?: (exportFn: () => void) => void;
+  selectedProgram: string;
+  onSelectedProgramChange: (v: string) => void;
+  selectedKeywordId: string;
+  onSelectedKeywordIdChange: (v: string) => void;
 }
 
-export function ResultsTable({ onExportReady }: ResultsTableProps) {
+export function ResultsTable({
+  onExportReady,
+  selectedProgram,
+  onSelectedProgramChange,
+  selectedKeywordId,
+  onSelectedKeywordIdChange,
+}: ResultsTableProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [selectedProgram, setSelectedProgram] = useState('');
   const [filters, setFilters] = useState({
-    keyword_id: '',
     search_engine_id: '',
     date_from: '',
     date_to: '',
   });
 
   const { data: results, isLoading } = useCrawlResults({
-    keyword_id: filters.keyword_id || undefined,
+    keyword_id: selectedKeywordId || undefined,
     search_engine_id: filters.search_engine_id || undefined,
     date_from: filters.date_from || undefined,
     date_to: filters.date_to || undefined,
@@ -175,8 +183,8 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
         <Select
           value={selectedProgram || 'all'}
           onValueChange={(v) => {
-            setSelectedProgram(v === 'all' ? '' : v);
-            handleFilterChange({ ...filters, keyword_id: '' });
+            onSelectedProgramChange(v === 'all' ? '' : v);
+            onSelectedKeywordIdChange('');
           }}
         >
           <SelectTrigger className="w-40">
@@ -192,8 +200,8 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
 
         {/* Keyword filter (filtered by program) */}
         <Select
-          value={filters.keyword_id || 'all'}
-          onValueChange={(v) => handleFilterChange({ ...filters, keyword_id: v === 'all' ? '' : v })}
+          value={selectedKeywordId || 'all'}
+          onValueChange={(v) => onSelectedKeywordIdChange(v === 'all' ? '' : v)}
         >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="키워드 선택" />
@@ -267,8 +275,9 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
         <Button
           variant="outline"
           onClick={() => {
-            setSelectedProgram('');
-            handleFilterChange({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' });
+            onSelectedProgramChange('');
+            onSelectedKeywordIdChange('');
+            handleFilterChange({ search_engine_id: '', date_from: '', date_to: '' });
           }}
         >
           초기화
