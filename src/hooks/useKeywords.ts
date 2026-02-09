@@ -38,7 +38,7 @@ export function useCreateKeyword() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: { keyword: string; category_id: string | null; is_active: boolean }) => {
+    mutationFn: async (data: { keyword: string; program?: string | null; category_id: string | null; is_active: boolean }) => {
       const { data: result, error } = await supabase
         .from('keywords')
         .insert(data)
@@ -67,7 +67,7 @@ export function useUpdateKeyword() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; keyword?: string; category_id?: string | null; is_active?: boolean }) => {
+    mutationFn: async ({ id, ...data }: { id: string; keyword?: string; program?: string | null; category_id?: string | null; is_active?: boolean }) => {
       const { data: result, error } = await supabase
         .from('keywords')
         .update(data)

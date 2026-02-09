@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ import type { Keyword, KeywordCategory } from '@/types/database';
 
 const formSchema = z.object({
   keyword: z.string().min(1, '키워드를 입력하세요'),
+  program: z.string().nullable(),
   category_id: z.string().nullable(),
   is_active: z.boolean(),
 });
@@ -142,26 +144,26 @@ export function KeywordDialog({ open, onOpenChange, editData }: KeywordDialogPro
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: { keyword: '', category_id: null, is_active: true },
+    defaultValues: { keyword: '', program: null, category_id: null, is_active: true },
   });
 
   useEffect(() => {
     if (editData) {
-      form.reset({ keyword: editData.keyword, category_id: editData.category_id, is_active: editData.is_active });
+      form.reset({ keyword: editData.keyword, program: editData.program ?? null, category_id: editData.category_id, is_active: editData.is_active });
     } else {
-      form.reset({ keyword: '', category_id: null, is_active: true });
+      form.reset({ keyword: '', program: null, category_id: null, is_active: true });
     }
   }, [editData, form]);
 
   const onSubmit = (data: FormData) => {
     if (editData) {
       updateKeyword.mutate(
-        { id: editData.id, keyword: data.keyword, category_id: data.category_id, is_active: data.is_active },
+        { id: editData.id, keyword: data.keyword, program: data.program, category_id: data.category_id, is_active: data.is_active },
         { onSuccess: () => onOpenChange(false) }
       );
     } else {
       createKeyword.mutate(
-        { keyword: data.keyword, category_id: data.category_id, is_active: data.is_active },
+        { keyword: data.keyword, program: data.program, category_id: data.category_id, is_active: data.is_active },
         { onSuccess: () => { form.reset(); onOpenChange(false); } }
       );
     }
@@ -193,6 +195,33 @@ export function KeywordDialog({ open, onOpenChange, editData }: KeywordDialogPro
                       <FormControl>
                         <Input placeholder="검색할 키워드 입력" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="program"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>프로그램</FormLabel>
+                      <Select
+                        value={field.value || 'none'}
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="프로그램 선택" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">프로그램 없음</SelectItem>
+                          {PROGRAMS.filter(p => p !== '전체(합산)').map((prog) => (
+                            <SelectItem key={prog} value={prog}>{prog}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
