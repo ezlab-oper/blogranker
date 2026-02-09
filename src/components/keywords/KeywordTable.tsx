@@ -37,6 +37,8 @@ import type { Keyword, KeywordCategory } from '@/types/database';
 import type { KeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 
 interface KeywordTableProps {
+  keywords: (Keyword & { category: KeywordCategory | null })[];
+  isLoading: boolean;
   onEdit: (keyword: Keyword & { category: KeywordCategory | null }) => void;
   readonly?: boolean;
   searchVolumeData?: Record<string, KeywordSearchVolume>;
@@ -51,8 +53,7 @@ function formatCount(value: number | string | undefined): string {
   return num.toLocaleString();
 }
 
-export function KeywordTable({ onEdit, readonly = false, searchVolumeData, fetchedAt }: KeywordTableProps) {
-  const { data: keywords, isLoading } = useKeywords();
+export function KeywordTable({ keywords, isLoading, onEdit, readonly = false, searchVolumeData, fetchedAt }: KeywordTableProps) {
   const updateKeyword = useUpdateKeyword();
   const deleteKeyword = useDeleteKeyword();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -185,7 +186,16 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData, fetch
                         </TableCell>
                         <TableCell className="text-center">
                           {compIdx ? (
-                            <Badge variant={compIdx === '높음' ? 'destructive' : compIdx === '중간' ? 'secondary' : 'outline'}>
+                            <Badge
+                              variant="outline"
+                              className={
+                                compIdx === '높음'
+                                  ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800'
+                                  : compIdx === '중간'
+                                  ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+                                  : 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
+                              }
+                            >
                               {compIdx}
                             </Badge>
                           ) : '-'}
