@@ -21,6 +21,7 @@ interface NaverKeywordResponse {
 export function useKeywordSearchVolume() {
   const [data, setData] = useState<Record<string, KeywordSearchVolume>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const { toast } = useToast();
 
   const fetchSearchVolume = async (keywords: string[]) => {
@@ -62,6 +63,7 @@ export function useKeywordSearchVolume() {
       }
 
       setData(volumeMap);
+      setFetchedAt(new Date());
       toast({ title: '검색량 데이터를 불러왔습니다.' });
     } catch (error: any) {
       console.error('Search volume fetch error:', error);
@@ -79,5 +81,5 @@ export function useKeywordSearchVolume() {
     return data[keyword.toLowerCase()];
   };
 
-  return { data, isLoading, fetchSearchVolume, getVolume };
+  return { data, isLoading, fetchedAt, fetchSearchVolume, getVolume };
 }
