@@ -97,9 +97,11 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: Key
               <TableHead>카테고리</TableHead>
               {hasVolumeData && (
                 <>
-                  <TableHead className="text-right">PC 검색량</TableHead>
-                  <TableHead className="text-right">모바일 검색량</TableHead>
-                  <TableHead className="text-right">합계</TableHead>
+                  <TableHead className="text-right">PC 검색수</TableHead>
+                  <TableHead className="text-right">모바일 검색수</TableHead>
+                  <TableHead className="text-right">PC 클릭수</TableHead>
+                  <TableHead className="text-right">모바일 클릭수</TableHead>
+                  <TableHead className="text-center">경쟁정도</TableHead>
                 </>
               )}
               <TableHead>등록일</TableHead>
@@ -112,10 +114,9 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: Key
                 const volume = searchVolumeData?.[kw.keyword.toLowerCase()];
                 const pcCount = volume?.monthlyPcQcCnt;
                 const mobileCount = volume?.monthlyMobileQcCnt;
-                const total = pcCount !== undefined && mobileCount !== undefined
-                  && typeof pcCount === 'number' && typeof mobileCount === 'number'
-                  ? pcCount + mobileCount
-                  : undefined;
+                const pcClick = volume?.monthlyAvePcClkCnt;
+                const mobileClick = volume?.monthlyAveMobileClkCnt;
+                const compIdx = volume?.compIdx;
 
                 return (
                   <motion.tr
@@ -169,8 +170,18 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData }: Key
                         <TableCell className="text-right tabular-nums">
                           {formatCount(mobileCount)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">
-                          {total !== undefined ? total.toLocaleString() : '-'}
+                        <TableCell className="text-right tabular-nums">
+                          {pcClick !== undefined ? pcClick.toFixed(1) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {mobileClick !== undefined ? mobileClick.toFixed(1) : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {compIdx ? (
+                            <Badge variant={compIdx === '높음' ? 'destructive' : compIdx === '중간' ? 'secondary' : 'outline'}>
+                              {compIdx}
+                            </Badge>
+                          ) : '-'}
                         </TableCell>
                       </>
                     )}
