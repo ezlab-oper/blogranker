@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.naver-keyword-search]
 verify_jwt = false
+
+[functions.sync-blog-urls]
+verify_jwt = false

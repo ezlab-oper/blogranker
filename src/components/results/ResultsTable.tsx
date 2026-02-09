@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/popover';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
+import { useBlogUrls, buildBlogUrlMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
 import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
@@ -81,6 +82,13 @@ export function ResultsTable({
   });
   const { data: allKeywords } = useKeywords();
   const { data: engines } = useSearchEngines();
+  const { data: blogUrls } = useBlogUrls();
+
+  // Build URL matchers for highlighting
+  const matchers = useMemo(() => {
+    if (!blogUrls || blogUrls.length === 0) return null;
+    return buildBlogUrlMatchers(blogUrls);
+  }, [blogUrls]);
 
   // Filter keywords by selected program
   const filteredKeywords = useMemo(() => {
@@ -335,63 +343,89 @@ export function ResultsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedResults.map((result, index) => (
-                <motion.tr
-                  key={result.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: index * 0.01 }}
-                  className="group"
-                >
-                  <TableCell>
-                    <span className={getRankBadgeClass(result.rank)}>{result.rank}</span>
-                  </TableCell>
-                  <TableCell>
-                    {result.search_engine && getEngineBadge(result.search_engine.name)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-medium">{result.keyword?.keyword}</span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm line-clamp-1">{result.blog_title}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {result.blog_author && (
-                          <span className="flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            {result.blog_author}
-                          </span>
-                        )}
-                        {result.blog_platform && (
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3 h-3" />
-                            {result.blog_platform}
-                          </span>
+              {paginatedResults.map((result, index) => {
+                const matchType: MatchType = matchers
+                  ? getMatchType(result.blog_url, result.keyword?.program || null, matchers)
+                  : 'none';
+
+                const rowBg = matchType === 'exact_url'
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
+                  : '';
+
+                return (
+                  <motion.tr
+                    key={result.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.01 }}
+                    className={cn("group", rowBg)}
+                  >
+                    <TableCell>
+                      <span className={getRankBadgeClass(result.rank)}>{result.rank}</span>
+                    </TableCell>
+                    <TableCell>
+                      {result.search_engine && getEngineBadge(result.search_engine.name)}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium">{result.keyword?.keyword}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className={cn(
+                          "font-medium text-sm line-clamp-1",
+                          matchType === 'exact_url' && "text-emerald-700 dark:text-emerald-400"
+                        )}>
+                          {result.blog_title}
+                          {matchType === 'exact_url' && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                              우리 포스팅
+                            </span>
+                          )}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {result.blog_author && (
+                            <span className={cn(
+                              "flex items-center gap-1",
+                              matchType === 'same_blog_id' && "px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-medium",
+                            )}>
+                              <User className="w-3 h-3" />
+                              {result.blog_author}
+                              {matchType === 'same_blog_id' && (
+                                <span className="text-[10px] ml-1">우리 블로거</span>
+                              )}
+                            </span>
+                          )}
+                          {result.blog_platform && (
+                            <span className="flex items-center gap-1">
+                              <FileText className="w-3 h-3" />
+                              {result.blog_platform}
+                            </span>
+                          )}
+                        </div>
+                        {result.snippet && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">{result.snippet}</p>
                         )}
                       </div>
-                      {result.snippet && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">{result.snippet}</p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm text-muted-foreground leading-tight">
-                      <div>{format(new Date(result.crawled_at), 'yyyy-MM-dd')}</div>
-                      <div className="text-xs">{format(new Date(result.crawled_at), 'HH:mm:ss')}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <a
-                      href={result.blog_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 inline-flex"
-                    >
-                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </a>
-                  </TableCell>
-                </motion.tr>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-muted-foreground leading-tight">
+                        <div>{format(new Date(result.crawled_at), 'yyyy-MM-dd')}</div>
+                        <div className="text-xs">{format(new Date(result.crawled_at), 'HH:mm:ss')}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <a
+                        href={result.blog_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 inline-flex"
+                      >
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                      </a>
+                    </TableCell>
+                  </motion.tr>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
