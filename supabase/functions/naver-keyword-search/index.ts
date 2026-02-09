@@ -59,9 +59,22 @@ serve(async (req) => {
       );
     }
 
-    const API_KEY = Deno.env.get("NAVER_AD_API_KEY")!;
-    const SECRET_KEY = Deno.env.get("NAVER_AD_SECRET_KEY")!;
-    const CUSTOMER_ID = Deno.env.get("NAVER_AD_CUSTOMER_ID")!;
+    const API_KEY = (Deno.env.get("NAVER_AD_API_KEY") || "").trim();
+    const SECRET_KEY = (Deno.env.get("NAVER_AD_SECRET_KEY") || "").trim();
+    // Handle case where secret might contain "CUSTOMER_ID = 3279114" format
+    let CUSTOMER_ID = (Deno.env.get("NAVER_AD_CUSTOMER_ID") || "").trim();
+    if (CUSTOMER_ID.includes("=")) {
+      CUSTOMER_ID = CUSTOMER_ID.split("=").pop()!.trim();
+    }
+
+    console.log("Debug - CUSTOMER_ID:", JSON.stringify(CUSTOMER_ID));
+
+    if (!API_KEY || !SECRET_KEY || !CUSTOMER_ID) {
+      return new Response(
+        JSON.stringify({ error: "Missing API credentials", hasApiKey: !!API_KEY, hasSecret: !!SECRET_KEY, hasCustomerId: !!CUSTOMER_ID }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const BASE_URL = "https://api.naver.com";
     const uri = "/keywordstool";
