@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Loader2, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,18 +21,40 @@ export default function Results() {
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
 
+  // Lifted filter state shared with ResultsTable
+  const [selectedProgram, setSelectedProgram] = useState('');
+  const [selectedKeywordId, setSelectedKeywordId] = useState('');
+
+  // Determine which keywords to crawl based on filters
+  const crawlTargets = useMemo(() => {
+    if (!keywords) return [];
+    let targets = keywords.filter(k => k.is_active);
+    if (selectedProgram) {
+      targets = targets.filter(k => k.program === selectedProgram);
+    }
+    if (selectedKeywordId) {
+      targets = targets.filter(k => k.id === selectedKeywordId);
+    }
+    return targets;
+  }, [keywords, selectedProgram, selectedKeywordId]);
+
+  const crawlLabel = selectedKeywordId
+    ? crawlTargets[0]?.keyword || '선택 키워드'
+    : selectedProgram
+    ? `${selectedProgram} (${crawlTargets.length}개)`
+    : `전체 (${crawlTargets.length}개)`;
+
   const handleStartCrawl = async () => {
-    const activeKeywords = keywords?.filter(k => k.is_active) || [];
-    if (activeKeywords.length === 0) {
-      toast({ title: '활성 키워드 없음', description: '수집할 활성 키워드가 없습니다.', variant: 'destructive' });
+    if (crawlTargets.length === 0) {
+      toast({ title: '수집 대상 없음', description: '선택한 조건에 해당하는 활성 키워드가 없습니다.', variant: 'destructive' });
       return;
     }
     setIsCrawling(true);
     setCrawlProgress(null);
-    toast({ title: '수집 시작', description: `${activeKeywords.length}개 키워드 수집을 시작합니다.` });
+    toast({ title: '수집 시작', description: `${crawlTargets.length}개 키워드 수집을 시작합니다.` });
 
     try {
-      const result = await runCrawlJob(activeKeywords.map(k => k.id), (p) => setCrawlProgress(p));
+      const result = await runCrawlJob(crawlTargets.map(k => k.id), (p) => setCrawlProgress(p));
       if (result.success) {
         toast({ title: '수집 완료', description: '키워드 수집이 완료되었습니다.' });
       } else if (result.cancelled) {
@@ -79,6 +101,7 @@ export default function Results() {
             className="gradient-primary text-white gap-2"
             onClick={handleStartCrawl}
             disabled={isCrawling || !canPerformActions}
+            title={`수집 대상: ${crawlLabel}`}
           >
             {isCrawling ? (
               <>
@@ -88,7 +111,7 @@ export default function Results() {
             ) : (
               <>
                 <Play className="w-4 h-4" />
-                수집 시작
+                수집 시작 ({crawlLabel})
               </>
             )}
           </Button>
@@ -131,7 +154,12 @@ export default function Results() {
         )}
 
         {/* Results Table */}
-        <ResultsTable />
+        <ResultsTable
+          selectedProgram={selectedProgram}
+          onSelectedProgramChange={setSelectedProgram}
+          selectedKeywordId={selectedKeywordId}
+          onSelectedKeywordIdChange={setSelectedKeywordId}
+        />
       </div>
     </AppLayout>
   );
