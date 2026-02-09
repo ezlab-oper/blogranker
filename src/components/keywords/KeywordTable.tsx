@@ -96,16 +96,17 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData, fetch
             <TableRow className="bg-muted/50">
               <TableHead className="w-12">상태</TableHead>
               <TableHead>키워드</TableHead>
+              <TableHead>프로그램</TableHead>
               <TableHead>카테고리</TableHead>
               {hasVolumeData && (
-                <>
-                  <TableHead className="text-right">PC 검색수</TableHead>
-                  <TableHead className="text-right">모바일 검색수</TableHead>
-                  <TableHead className="text-right">PC 클릭수</TableHead>
-                  <TableHead className="text-right">모바일 클릭수</TableHead>
-                  <TableHead className="text-center">경쟁정도</TableHead>
-                  <TableHead>조회일시</TableHead>
-                </>
+              <>
+                <TableHead className="text-right">PC 검색수</TableHead>
+                <TableHead className="text-right">모바일 검색수</TableHead>
+                <TableHead className="text-right">PC 클릭수</TableHead>
+                <TableHead className="text-right">모바일 클릭수</TableHead>
+                <TableHead className="text-center">경쟁정도</TableHead>
+                <TableHead>조회일시</TableHead>
+              </>
               )}
               <TableHead>등록일</TableHead>
               <TableHead className="text-right w-20">작업</TableHead>
@@ -147,6 +148,9 @@ export function KeywordTable({ onEdit, readonly = false, searchVolumeData, fetch
                         )}
                         <span className="font-medium">{kw.keyword}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{kw.program || '-'}</span>
                     </TableCell>
                     <TableCell>
                       {kw.category ? (

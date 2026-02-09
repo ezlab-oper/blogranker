@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, BarChart3, Loader2, Search } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -23,6 +23,14 @@ export default function Keywords() {
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  // 페이지 로드 시 검색량 자동 조회
+  useEffect(() => {
+    if (keywords && keywords.length > 0 && !fetchedAt && !isLoadingVolume) {
+      const keywordStrings = keywords.map(kw => kw.keyword);
+      fetchSearchVolume(keywordStrings);
+    }
+  }, [keywords]);
 
   const handleEdit = (keyword: Keyword & { category: KeywordCategory | null }) => {
     setEditData(keyword);
