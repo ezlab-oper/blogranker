@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Calendar, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, Calendar as CalendarIcon, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -19,12 +18,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
+import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -50,6 +57,7 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [selectedProgram, setSelectedProgram] = useState('');
   const [filters, setFilters] = useState({
     keyword_id: '',
     search_engine_id: '',
@@ -63,8 +71,15 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
     date_from: filters.date_from || undefined,
     date_to: filters.date_to || undefined,
   });
-  const { data: keywords } = useKeywords();
+  const { data: allKeywords } = useKeywords();
   const { data: engines } = useSearchEngines();
+
+  // Filter keywords by selected program
+  const filteredKeywords = useMemo(() => {
+    if (!allKeywords) return [];
+    if (!selectedProgram) return allKeywords;
+    return allKeywords.filter(kw => kw.program === selectedProgram);
+  }, [allKeywords, selectedProgram]);
 
   // Sort: Naver first, then by rank ascending (1→10)
   const sortedResults = results ? [...results].sort((a, b) => {
@@ -156,6 +171,26 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-4 p-4 bg-card rounded-xl border shadow-card">
+        {/* Program filter */}
+        <Select
+          value={selectedProgram || 'all'}
+          onValueChange={(v) => {
+            setSelectedProgram(v === 'all' ? '' : v);
+            handleFilterChange({ ...filters, keyword_id: '' });
+          }}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="프로그램" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            <SelectItem value="all">전체 프로그램</SelectItem>
+            {PROGRAMS.filter(p => p !== '전체(합산)').map((prog) => (
+              <SelectItem key={prog} value={prog}>{prog}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Keyword filter (filtered by program) */}
         <Select
           value={filters.keyword_id || 'all'}
           onValueChange={(v) => handleFilterChange({ ...filters, keyword_id: v === 'all' ? '' : v })}
@@ -165,7 +200,7 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
           </SelectTrigger>
           <SelectContent className="bg-popover">
             <SelectItem value="all">전체 키워드</SelectItem>
-            {keywords?.map((kw) => (
+            {filteredKeywords.map((kw) => (
               <SelectItem key={kw.id} value={kw.id}>
                 {kw.keyword}
               </SelectItem>
@@ -190,25 +225,51 @@ export function ResultsTable({ onExportReady }: ResultsTableProps) {
           </SelectContent>
         </Select>
 
+        {/* Date range with Shadcn DatePicker */}
         <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={filters.date_from}
-            onChange={(e) => handleFilterChange({ ...filters, date_from: e.target.value })}
-            className="w-40"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !filters.date_from && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filters.date_from ? format(new Date(filters.date_from), 'yyyy-MM-dd') : '시작일'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.date_from ? new Date(filters.date_from) : undefined}
+                onSelect={(d) => handleFilterChange({ ...filters, date_from: d ? format(d, 'yyyy-MM-dd') : '' })}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
           <span className="text-muted-foreground">~</span>
-          <Input
-            type="date"
-            value={filters.date_to}
-            onChange={(e) => handleFilterChange({ ...filters, date_to: e.target.value })}
-            className="w-40"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !filters.date_to && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filters.date_to ? format(new Date(filters.date_to), 'yyyy-MM-dd') : '종료일'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.date_to ? new Date(filters.date_to) : undefined}
+                onSelect={(d) => handleFilterChange({ ...filters, date_to: d ? format(d, 'yyyy-MM-dd') : '' })}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <Button
           variant="outline"
-          onClick={() => handleFilterChange({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' })}
+          onClick={() => {
+            setSelectedProgram('');
+            handleFilterChange({ keyword_id: '', search_engine_id: '', date_from: '', date_to: '' });
+          }}
         >
           초기화
         </Button>
