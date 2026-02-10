@@ -42,50 +42,53 @@ function extractBlogId(url: string): string | null {
   }
 }
 
-// Create JWT for Google Service Account auth
-async function createJWT(email: string, privateKeyPem: string): Promise<string> {
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: email,
-    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  };
+// Custom base64 decoder that's more lenient than atob
+function base64Decode(input: string): Uint8Array {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Map<string, number>();
+  for (let i = 0; i < chars.length; i++) lookup.set(chars[i], i);
+  lookup.set('=', 0);
+  
+  // Filter to only valid base64 characters
+  const clean = input.split('').filter(c => lookup.has(c) || c === '=').join('');
+  
+  const len = clean.length;
+  let outLen = Math.floor(len * 3 / 4);
+  if (clean[len - 1] === '=') outLen--;
+  if (clean[len - 2] === '=') outLen--;
+  
+  const out = new Uint8Array(outLen);
+  let p = 0;
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup.get(clean[i]) || 0;
+    const b = lookup.get(clean[i + 1]) || 0;
+    const c = lookup.get(clean[i + 2]) || 0;
+    const d = lookup.get(clean[i + 3]) || 0;
+    out[p++] = (a << 2) | (b >> 4);
+    if (p < outLen) out[p++] = ((b & 15) << 4) | (c >> 2);
+    if (p < outLen) out[p++] = ((c & 3) << 6) | (d & 63);
+  }
+  return out;
+}
 
-  const toBase64Url = (data: Uint8Array): string => {
-    let binary = '';
-    for (let i = 0; i < data.length; i++) {
-      binary += String.fromCharCode(data[i]);
-    }
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-
-  const encodeJson = (obj: unknown): string => {
-    return toBase64Url(new TextEncoder().encode(JSON.stringify(obj)));
-  };
-
-  const headerB64 = encodeJson(header);
-  const payloadB64 = encodeJson(payload);
-  const signingInput = `${headerB64}.${payloadB64}`;
-
-  // Import private key - handle various escaped newline formats
-  let cleanKey = privateKeyPem;
-  // Handle double-escaped newlines (\\n → \n)
-  cleanKey = cleanKey.replace(/\\n/g, '\n');
-  // Handle literal string "-----BEGIN PRIVATE KEY-----\n" etc.
-  const pemBody = cleanKey
+// Create signed JWT for Google Service Account auth
+async function getAccessToken(email: string, privateKeyPem: string): Promise<string> {
+  // Handle escaped newlines from secret storage
+  let cleanKey = privateKeyPem.replace(/\\n/g, '\n');
+  
+  // Extract base64 content from PEM
+  const b64 = cleanKey
     .replace(/-+BEGIN PRIVATE KEY-+/g, '')
     .replace(/-+END PRIVATE KEY-+/g, '')
-    .replace(/[\s\r\n]/g, '');
+    .replace(/[^A-Za-z0-9+/=]/g, '');
   
+  // Truncate to valid length (multiple of 4)
+  const validLen = b64.length - (b64.length % 4);
+  const trimmed = b64.substring(0, validLen);
   
-  // Use Deno's built-in base64 decoding
-  const raw = atob(pemBody);
-  const keyBytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) keyBytes[i] = raw.charCodeAt(i);
-
+  // Decode key using lenient decoder
+  const keyBytes = base64Decode(trimmed);
+  
   const key = await crypto.subtle.importKey(
     'pkcs8',
     keyBytes.buffer,
@@ -94,19 +97,36 @@ async function createJWT(email: string, privateKeyPem: string): Promise<string> 
     ['sign']
   );
 
+  // Build JWT
+  const toBase64Url = (data: Uint8Array): string => {
+    let binary = '';
+    for (let i = 0; i < data.length; i++) binary += String.fromCharCode(data[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+
+  const encodeJson = (obj: unknown): string =>
+    toBase64Url(new TextEncoder().encode(JSON.stringify(obj)));
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = encodeJson({ alg: 'RS256', typ: 'JWT' });
+  const payload = encodeJson({
+    iss: email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  });
+
+  const signingInput = `${header}.${payload}`;
   const signature = await crypto.subtle.sign(
     'RSASSA-PKCS1-v1_5',
     key,
     new TextEncoder().encode(signingInput)
   );
 
-  const sigB64 = toBase64Url(new Uint8Array(signature));
+  const jwt = `${signingInput}.${toBase64Url(new Uint8Array(signature))}`;
 
-  return `${signingInput}.${sigB64}`;
-}
-
-async function getAccessToken(email: string, privateKey: string): Promise<string> {
-  const jwt = await createJWT(email, privateKey);
+  // Exchange JWT for access token
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -122,6 +142,8 @@ async function getAccessToken(email: string, privateKey: string): Promise<string
   const data = await res.json();
   return data.access_token;
 }
+
+
 
 async function fetchSheetColumn(
   accessToken: string,
