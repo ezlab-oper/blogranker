@@ -54,6 +54,14 @@ export default function Results() {
     }
     setIsCrawling(true);
     setCrawlProgress(null);
+
+    // Auto-sync blog URLs before crawling
+    try {
+      await syncBlogUrls.mutateAsync();
+    } catch (e) {
+      console.warn('Blog URL sync failed, continuing with crawl:', e);
+    }
+
     toast({ title: '수집 시작', description: `${crawlTargets.length}개 키워드 수집을 시작합니다.` });
 
     try {
