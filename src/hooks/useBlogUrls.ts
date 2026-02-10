@@ -71,6 +71,20 @@ export function extractBlogId(url: string): string | null {
   }
 }
 
+// Normalize URL: strip mobile prefix for consistent matching
+export function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    // Normalize m.blog.naver.com → blog.naver.com
+    if (u.hostname === 'm.blog.naver.com') {
+      u.hostname = 'blog.naver.com';
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 // Build lookup sets for fast matching
 export function buildBlogUrlMatchers(blogUrls: BlogUrl[]) {
   // URL set for exact match
@@ -80,9 +94,10 @@ export function buildBlogUrlMatchers(blogUrls: BlogUrl[]) {
   const urlsByProgram = new Map<string, Set<string>>();
 
   for (const b of blogUrls) {
-    // URLs by program
+    // URLs by program (store both original and normalized)
     if (!urlsByProgram.has(b.program)) urlsByProgram.set(b.program, new Set());
     urlsByProgram.get(b.program)!.add(b.blog_url);
+    urlsByProgram.get(b.program)!.add(normalizeUrl(b.blog_url));
 
     // Blog IDs by program
     if (b.blog_id) {
@@ -103,10 +118,10 @@ export function getMatchType(
 ): MatchType {
   const { urlsByProgram, blogIdsByProgram } = matchers;
 
-  // Check exact URL match (within the same program)
+  // Check exact URL match (within the same program), also try normalized URL
   if (resultProgram) {
     const programUrls = urlsByProgram.get(resultProgram);
-    if (programUrls?.has(resultUrl)) return 'exact_url';
+    if (programUrls?.has(resultUrl) || programUrls?.has(normalizeUrl(resultUrl))) return 'exact_url';
   }
 
   // Check blog ID match (same blog author, different post)

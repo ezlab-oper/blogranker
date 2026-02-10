@@ -301,6 +301,23 @@ export function ResultsTable({
         </Button>
       </div>
 
+      {/* Highlight Legend */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">범례:</span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-emerald-500/20 border border-emerald-500/30" />
+          우리 포스팅 (URL 일치)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-sky-500/20 border border-sky-500/30" />
+          우리 블로거 (블로그 ID 일치)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-muted border" />
+          일반
+        </span>
+      </div>
+
       {/* Results count and page size selector */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
