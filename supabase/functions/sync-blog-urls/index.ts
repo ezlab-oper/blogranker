@@ -153,15 +153,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON');
-    if (!serviceAccountJson) {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not configured');
-    }
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    const email = serviceAccount.client_email;
-    const privateKey = serviceAccount.private_key;
-    if (!email || !privateKey) {
-      throw new Error('Invalid service account JSON: missing client_email or private_key');
+    // Service account email (not sensitive - safe to include in code)
+    const email = 'ezlab-368@ezlab-468909.iam.gserviceaccount.com';
+    const privateKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY');
+    if (!privateKey) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is not configured');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
