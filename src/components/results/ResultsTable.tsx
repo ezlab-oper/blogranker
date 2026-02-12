@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Calendar as CalendarIcon, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,20 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
+import { useCrawlResults } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useBlogUrls, buildBlogUrlMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
 import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
 import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -68,20 +61,11 @@ export function ResultsTable({
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [filters, setFilters] = useState({
-    search_engine_id: '',
-    date_from: '',
-    date_to: '',
-  });
 
   const { data: results, isLoading } = useCrawlResults({
     keyword_id: selectedKeywordId || undefined,
-    search_engine_id: filters.search_engine_id || undefined,
-    date_from: filters.date_from || undefined,
-    date_to: filters.date_to || undefined,
   });
   const { data: allKeywords } = useKeywords();
-  const { data: engines } = useSearchEngines();
   const { data: blogUrls } = useBlogUrls();
 
   // Build URL matchers for highlighting
@@ -111,12 +95,6 @@ export function ResultsTable({
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedResults = sortedResults?.slice(startIndex, endIndex);
-
-  // Reset to first page when filters change
-  const handleFilterChange = (newFilters: typeof filters) => {
-    setFilters(newFilters);
-    setCurrentPage(1);
-  };
 
   const handlePageSizeChange = (newSize: string) => {
     setPageSize(Number(newSize));
@@ -224,68 +202,12 @@ export function ResultsTable({
           </SelectContent>
         </Select>
 
-        <Select
-          value={filters.search_engine_id || 'all'}
-          onValueChange={(v) => handleFilterChange({ ...filters, search_engine_id: v === 'all' ? '' : v })}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="검색 엔진" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover">
-            <SelectItem value="all">전체 엔진</SelectItem>
-            {engines?.map((engine) => (
-              <SelectItem key={engine.id} value={engine.id}>
-                {engine.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Date range with Shadcn DatePicker */}
-        <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !filters.date_from && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {filters.date_from ? format(new Date(filters.date_from), 'yyyy-MM-dd') : '시작일'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={filters.date_from ? new Date(filters.date_from) : undefined}
-                onSelect={(d) => handleFilterChange({ ...filters, date_from: d ? format(d, 'yyyy-MM-dd') : '' })}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-          <span className="text-muted-foreground">~</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !filters.date_to && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {filters.date_to ? format(new Date(filters.date_to), 'yyyy-MM-dd') : '종료일'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={filters.date_to ? new Date(filters.date_to) : undefined}
-                onSelect={(d) => handleFilterChange({ ...filters, date_to: d ? format(d, 'yyyy-MM-dd') : '' })}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
         <Button
           variant="outline"
           onClick={() => {
             onSelectedProgramChange('');
             onSelectedKeywordIdChange('');
-            handleFilterChange({ search_engine_id: '', date_from: '', date_to: '' });
+            setCurrentPage(1);
           }}
         >
           초기화

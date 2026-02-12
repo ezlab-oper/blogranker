@@ -59,8 +59,7 @@ export function RankTrendChart() {
   }, [dateRange]);
 
   const { data: results, isLoading } = useCrawlResults({
-    search_engine_id: selectedEngineTab === 'all' ? undefined : selectedEngineTab,
-    date_from: dateFrom,
+    latestOnly: false,
   });
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();

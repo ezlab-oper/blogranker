@@ -19,9 +19,7 @@ export function useSearchEngines() {
 
 export function useCrawlResults(filters?: {
   keyword_id?: string;
-  search_engine_id?: string;
-  date_from?: string;
-  date_to?: string;
+  latestOnly?: boolean;
 }) {
   return useQuery({
     queryKey: ['crawl_results', filters],
@@ -34,24 +32,44 @@ export function useCrawlResults(filters?: {
           search_engine:search_engines(*)
         `)
         .order('crawled_at', { ascending: false })
-        .limit(500);
+        .limit(1000);
 
       if (filters?.keyword_id) {
         query = query.eq('keyword_id', filters.keyword_id);
       }
-      if (filters?.search_engine_id) {
-        query = query.eq('search_engine_id', filters.search_engine_id);
-      }
-      if (filters?.date_from) {
-        query = query.gte('crawled_at', filters.date_from);
-      }
-      if (filters?.date_to) {
-        query = query.lte('crawled_at', filters.date_to);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as CrawlResult[];
+
+      let results = data as CrawlResult[];
+
+      // Filter out AI briefing / naver internal URLs on the frontend
+      results = results.filter(r => {
+        if (r.blog_url.includes('m.search.naver.com') || r.blog_url.includes('search.naver.com')) return false;
+        if (r.blog_title.includes('AI 브리핑') || r.blog_title.includes('AI 답변')) return false;
+        return true;
+      });
+
+      // Keep only the latest crawl batch per keyword
+      if (filters?.latestOnly !== false) {
+        // Group by keyword_id, find the max crawled_at per keyword, then keep only results from that batch
+        const latestByKeyword = new Map<string, string>();
+        for (const r of results) {
+          const existing = latestByKeyword.get(r.keyword_id);
+          if (!existing || r.crawled_at > existing) {
+            latestByKeyword.set(r.keyword_id, r.crawled_at);
+          }
+        }
+        // Keep results within 60 seconds of the latest crawl per keyword (same batch)
+        results = results.filter(r => {
+          const latest = latestByKeyword.get(r.keyword_id);
+          if (!latest) return false;
+          const diff = new Date(latest).getTime() - new Date(r.crawled_at).getTime();
+          return diff < 60000; // within 1 minute = same batch
+        });
+      }
+
+      return results;
     },
   });
 }
