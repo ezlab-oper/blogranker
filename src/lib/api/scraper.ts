@@ -140,7 +140,12 @@ export async function runCrawlJob(
       }
 
       try {
-        const engineType = engine.name === '네이버' ? 'naver' : 'google';
+        // Only Naver is supported now
+        if (engine.name !== '네이버') {
+          processed++;
+          continue;
+        }
+        const engineType = 'naver' as const;
         
         // Report progress before starting
         onProgress?.({
@@ -155,8 +160,15 @@ export async function runCrawlJob(
         const result = await scrapeKeyword(kw.keyword, engineType);
 
         if (result.success && result.results) {
-          // Insert results
-          const resultsToInsert = result.results.map((r) => ({
+          // Deduplicate by URL before inserting
+          const seenUrls = new Set<string>();
+          const uniqueResults = result.results.filter((r) => {
+            if (seenUrls.has(r.url)) return false;
+            seenUrls.add(r.url);
+            return true;
+          });
+
+          const resultsToInsert = uniqueResults.map((r) => ({
             job_id: job.id,
             keyword_id: kw.id,
             search_engine_id: engine.id,
