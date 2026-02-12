@@ -169,9 +169,37 @@ function parseGoogleResults(markdown: string, links: string[] = []): BlogResult[
   return results;
 }
 
+// Extract URLs from Naver AI Briefing (Cue:) section in raw HTML
+function extractAiBriefingUrls(html: string): Set<string> {
+  const excludeUrls = new Set<string>();
+  if (!html) return excludeUrls;
+
+  // Match AI briefing sections by known class patterns
+  // Common classes: api_ai_briefing, cue-section, fusion-app, sc_ai, ai_answer
+  const aiSectionPatterns = [
+    /class="[^"]*(?:api_ai_briefing|cue[-_]section|fusion[-_]app|sc_ai|ai_answer|ai_briefing|api_subject_bx)[^"]*"[\s\S]*?<\/(?:div|section)>/gi,
+    /<div[^>]*data-[-\w]*="ai[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+  ];
+
+  for (const pattern of aiSectionPatterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      // Extract all href URLs from within the matched AI section
+      const hrefPattern = /href="(https?:\/\/[^"]+)"/g;
+      let hrefMatch;
+      while ((hrefMatch = hrefPattern.exec(match[0])) !== null) {
+        excludeUrls.add(hrefMatch[1]);
+      }
+    }
+  }
+
+  console.log(`Found ${excludeUrls.size} URLs in AI briefing sections to exclude`);
+  return excludeUrls;
+}
+
 // Parse Naver integrated search results - extract blog posts from main search page
 // Naver's integrated search shows blogs in specific sections (블로그, VIEW 영역 등)
-function parseNaverIntegratedResults(markdown: string, links: string[] = []): BlogResult[] {
+function parseNaverIntegratedResults(markdown: string, links: string[] = [], rawHtml: string = ''): BlogResult[] {
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
   
@@ -195,9 +223,18 @@ function parseNaverIntegratedResults(markdown: string, links: string[] = []): Bl
     '/blog_intro',
   ];
   
+  // Build exclusion set from AI briefing sections
+  const aiBriefingUrls = extractAiBriefingUrls(rawHtml);
+
   // First, extract blog links from the links array - ordered by appearance
   for (const url of links) {
     if (results.length >= MAX_RESULTS) break;
+
+    // Skip URLs found in AI briefing sections
+    if (aiBriefingUrls.has(url)) {
+      console.log(`Skipping AI briefing URL: ${url}`);
+      continue;
+    }
     
     // Check if it's a blog URL
     const isBlogUrl = blogDomains.some(domain => url.includes(domain));
@@ -316,7 +353,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: searchUrl,
-        formats: ['markdown', 'links'],
+        formats: ['markdown', 'links', 'rawHtml'],
         onlyMainContent: false,
         waitFor: 5000, // Wait longer for dynamic content
       }),
@@ -335,13 +372,14 @@ Deno.serve(async (req) => {
     // Parse results based on engine - use both markdown and links
     const markdown = data.data?.markdown || data.markdown || '';
     const links: string[] = data.data?.links || data.links || [];
+    const rawHtml: string = data.data?.rawHtml || data.rawHtml || '';
     
     console.log(`Received ${links.length} links from Firecrawl`);
     
     let blogResults: BlogResult[];
 
     if (engine === 'naver') {
-      blogResults = parseNaverIntegratedResults(markdown, links);
+      blogResults = parseNaverIntegratedResults(markdown, links, rawHtml);
     } else {
       blogResults = parseGoogleResults(markdown, links);
     }
