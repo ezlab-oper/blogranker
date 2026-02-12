@@ -154,7 +154,13 @@ Deno.serve(async (req) => {
           // Random delay between requests (3-7 seconds)
           await randomDelay(3000, 7000);
 
-          const engineType = engine.name.toLowerCase().includes('google') ? 'google' : 'naver';
+          const engineType = engine.name.toLowerCase().includes('네이버') || engine.name.toLowerCase().includes('naver') ? 'naver' : null;
+          
+          // Skip non-Naver engines
+          if (!engineType) {
+            console.log(`Skipping non-Naver engine: ${engine.name}`);
+            continue;
+          }
 
           // Call scrape-search function
           const response = await fetch(`${supabaseUrl}/functions/v1/scrape-search`, {
