@@ -55,97 +55,124 @@ function extractAuthorFromUrl(url: string): string | null {
   return null;
 }
 
-// Extract URLs from Naver AI Briefing (Cue:) section in raw HTML
-function extractAiBriefingUrls(html: string): Set<string> {
-  const excludeUrls = new Set<string>();
-  if (!html) return excludeUrls;
-
-  // Match AI briefing sections by known class patterns
-  const aiSectionPatterns = [
-    /class="[^"]*(?:api_ai_briefing|cue[-_]section|fusion[-_]app|sc_ai|ai_answer|ai_briefing|api_subject_bx|sc_new\s+api_ai_answer)[^"]*"[\s\S]*?<\/(?:div|section)>/gi,
-    /<div[^>]*data-[-\w]*="ai[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
-    // Broader: any element with "cue" in class
-    /class="[^"]*cue[^"]*"[\s\S]*?<\/(?:div|section)>/gi,
+// Check if a container block belongs to an excluded section (AI briefing, ads, etc.)
+function isExcludedSection(blockHtml: string): boolean {
+  const excludePatterns = [
+    /class="[^"]*(?:api_ai_briefing|cue[-_]section|fuser_section|fusion[-_]app|sc_ai|ai_answer|ai_briefing|api_subject_bx|sc_new\s+api_ai_answer|lb_ad)[^"]*"/i,
+    /class="[^"]*cue[^"]*"/i,
   ];
-
-  for (const pattern of aiSectionPatterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const hrefPattern = /href="(https?:\/\/[^"]+)"/g;
-      let hrefMatch;
-      while ((hrefMatch = hrefPattern.exec(match[0])) !== null) {
-        excludeUrls.add(hrefMatch[1]);
-      }
-    }
-  }
-
-  console.log(`Found ${excludeUrls.size} URLs in AI briefing sections to exclude`);
-  return excludeUrls;
+  // Check the opening tags (first 500 chars) for excluded classes
+  const head = blockHtml.substring(0, 500);
+  return excludePatterns.some(p => p.test(head));
 }
 
-// Parse Naver integrated search results - only from valid blog list sections
-function parseNaverIntegratedResults(markdown: string, links: string[] = [], rawHtml: string = ''): BlogResult[] {
-  const results: BlogResult[] = [];
+// Extract blog URLs from valid result containers in raw HTML
+function extractBlogUrlsFromHtml(rawHtml: string): { url: string; title: string }[] {
+  if (!rawHtml) return [];
+
+  const results: { url: string; title: string }[] = [];
   const addedUrls = new Set<string>();
   const MAX_RESULTS = 10;
 
   const blogDomains = ['blog.naver.com', 'm.blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
-
-  const excludePatterns = [
+  const excludeUrlPatterns = [
     'PostList.naver', 'BlogHome.naver', 'MyBlog.naver',
     'section.blog.naver.com', 'nid.naver.com', 'help.naver.com',
     'prologue', 'category=', 'Redirect=', '/blog_intro',
   ];
+  const postUrlPatterns = [
+    /blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/,
+    /m\.blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/,
+    /blog\.naver\.com\/PostView\.(nhn|naver)\?/,
+    /tistory\.com\/\d+/,
+    /tistory\.com\/entry\//,
+    /velog\.io\/@[^/]+\/[^/?]+/,
+    /brunch\.co\.kr\/@[^/]+\/\d+/,
+  ];
 
-  // Build exclusion set from AI briefing sections
-  const aiBriefingUrls = extractAiBriefingUrls(rawHtml);
+  // Find all result container blocks: <li class="bx ..."> or <div class="view_wrap ...">
+  // We match opening tag + content greedily but limited
+  const containerPattern = /<(?:li|div)\s+[^>]*class="[^"]*(?:(?<!\w)bx(?!\w)|view_wrap)[^"]*"[^>]*>[\s\S]*?<\/(?:li|div)>/gi;
+  
+  // Since greedy nested matching is hard with regex, use a simpler approach:
+  // Split HTML by container boundaries and process each chunk
+  const splitPattern = /(<(?:li|div)\s+[^>]*class="[^"]*(?:(?<!\w)bx(?!\w)|view_wrap)[^"]*"[^>]*>)/gi;
+  const parts = rawHtml.split(splitPattern);
 
-  for (const url of links) {
+  for (let i = 1; i < parts.length; i += 2) {
     if (results.length >= MAX_RESULTS) break;
 
-    // Skip URLs found in AI briefing sections
-    if (aiBriefingUrls.has(url)) {
-      console.log(`Skipping AI briefing URL: ${url}`);
+    const openingTag = parts[i];
+    const content = parts[i + 1] || '';
+    // Take a reasonable chunk (up to 5000 chars) as the block content
+    const block = openingTag + content.substring(0, 5000);
+
+    // Skip excluded sections (AI briefing, ads, etc.)
+    if (isExcludedSection(block)) {
+      console.log('Skipping excluded section (AI/Ad)');
       continue;
     }
 
-    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
-    if (!isBlogUrl) continue;
+    // Extract all href links from this block
+    const hrefPattern = /href="(https?:\/\/[^"]+)"/g;
+    let hrefMatch;
+    while ((hrefMatch = hrefPattern.exec(block)) !== null) {
+      if (results.length >= MAX_RESULTS) break;
 
-    const isExcluded = excludePatterns.some(pattern => url.includes(pattern));
-    if (isExcluded) continue;
+      const url = hrefMatch[1];
 
-    const isValidPost =
-      /blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
-      /m\.blog\.naver\.com\/[a-zA-Z0-9_-]+\/\d+/.test(url) ||
-      /blog\.naver\.com\/PostView\.(nhn|naver)\?/.test(url) ||
-      /tistory\.com\/\d+/.test(url) ||
-      /tistory\.com\/entry\//.test(url) ||
-      /velog\.io\/@[^/]+\/[^/?]+/.test(url) ||
-      /brunch\.co\.kr\/@[^/]+\/\d+/.test(url);
+      // Must be a blog domain
+      if (!blogDomains.some(d => url.includes(d))) continue;
+      // Must not be an excluded URL pattern
+      if (excludeUrlPatterns.some(p => url.includes(p))) continue;
+      // Must match a valid post URL pattern
+      if (!postUrlPatterns.some(p => p.test(url))) continue;
+      // No duplicates
+      if (addedUrls.has(url)) continue;
 
-    if (!isValidPost) continue;
-    if (addedUrls.has(url)) continue;
+      addedUrls.add(url);
 
-    addedUrls.add(url);
+      // Try to extract title from nearby anchor text
+      // Look for title_link or api_txt_lines patterns near this URL
+      let title = '블로그 포스트';
+      const titlePattern = new RegExp(`<a[^>]*href="${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>([^<]+)<`, 'i');
+      const titleMatch = block.match(titlePattern);
+      if (titleMatch && titleMatch[1].trim().length >= 5) {
+        title = titleMatch[1].trim();
+      }
 
-    results.push({
-      rank: results.length + 1,
-      title: '블로그 포스트',
-      author: extractAuthorFromUrl(url),
-      url,
-      snippet: null,
-      published_date: null,
-      platform: detectBlogPlatform(url),
-      thumbnail_url: null,
-    });
+      results.push({
+        url,
+        title,
+      });
+    }
   }
 
-  // Extract titles from markdown
+  return results;
+}
+
+// Parse Naver integrated search results using HTML-first approach
+function parseNaverIntegratedResults(markdown: string, links: string[] = [], rawHtml: string = ''): BlogResult[] {
+  // Primary: extract from HTML containers (.bx, .view_wrap) with AI/ad exclusion
+  const htmlResults = extractBlogUrlsFromHtml(rawHtml);
+
+  console.log(`Extracted ${htmlResults.length} blog URLs from HTML containers`);
+
+  const results: BlogResult[] = htmlResults.map((r, i) => ({
+    rank: i + 1,
+    title: r.title,
+    author: extractAuthorFromUrl(r.url),
+    url: r.url,
+    snippet: null,
+    published_date: null,
+    platform: detectBlogPlatform(r.url),
+    thumbnail_url: null,
+  }));
+
+  // Enrich titles from markdown if still default
   const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
   let match;
   const urlToTitle = new Map<string, string>();
-
   while ((match = linkPattern.exec(markdown)) !== null) {
     const title = match[1].trim();
     const url = match[2].trim();
@@ -153,16 +180,14 @@ function parseNaverIntegratedResults(markdown: string, links: string[] = [], raw
     if (title.includes('검색') || title.includes('메뉴') || title.includes('로그인')) continue;
     if (title.includes('블로그홈') || title.includes('이웃목록') || title.includes('더보기')) continue;
     if (title.startsWith('http') || title.startsWith('www.')) continue;
-
-    const isBlogUrl = blogDomains.some(domain => url.includes(domain));
-    if (isBlogUrl && !urlToTitle.has(url)) {
-      urlToTitle.set(url, title);
-    }
+    urlToTitle.set(url, title);
   }
 
   for (const result of results) {
-    const title = urlToTitle.get(result.url);
-    if (title) result.title = title;
+    if (result.title === '블로그 포스트') {
+      const betterTitle = urlToTitle.get(result.url);
+      if (betterTitle) result.title = betterTitle;
+    }
   }
 
   return results;
