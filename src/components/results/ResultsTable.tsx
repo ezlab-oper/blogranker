@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -68,23 +68,7 @@ export function ResultsTable({
   });
   const { data: allKeywords } = useKeywords();
   const { data: blogUrls } = useBlogUrls();
-  const { getVolume, fetchSearchVolume, isLoading: isVolumeLoading } = useKeywordSearchVolume();
-
-  // Auto-fetch search volume for keywords shown in results
-  const resultKeywords = useMemo(() => {
-    if (!results) return [];
-    const unique = new Set<string>();
-    for (const r of results) {
-      if (r.keyword?.keyword) unique.add(r.keyword.keyword);
-    }
-    return Array.from(unique);
-  }, [results]);
-
-  useEffect(() => {
-    if (resultKeywords.length > 0) {
-      fetchSearchVolume(resultKeywords);
-    }
-  }, [resultKeywords.join(',')]);
+  const { getVolume } = useKeywordSearchVolume();
 
   // Build URL matchers for highlighting
   const matchers = useMemo(() => {
