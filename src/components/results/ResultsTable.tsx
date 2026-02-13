@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ExternalLink, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
@@ -21,6 +21,7 @@ import {
 import { useCrawlResults } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useBlogUrls, buildBlogUrlMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
+import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
 import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
@@ -67,6 +68,23 @@ export function ResultsTable({
   });
   const { data: allKeywords } = useKeywords();
   const { data: blogUrls } = useBlogUrls();
+  const { getVolume, fetchSearchVolume, isLoading: isVolumeLoading } = useKeywordSearchVolume();
+
+  // Auto-fetch search volume for keywords shown in results
+  const resultKeywords = useMemo(() => {
+    if (!results) return [];
+    const unique = new Set<string>();
+    for (const r of results) {
+      if (r.keyword?.keyword) unique.add(r.keyword.keyword);
+    }
+    return Array.from(unique);
+  }, [results]);
+
+  useEffect(() => {
+    if (resultKeywords.length > 0) {
+      fetchSearchVolume(resultKeywords);
+    }
+  }, [resultKeywords.join(',')]);
 
   // Build URL matchers for highlighting
   const matchers = useMemo(() => {
@@ -276,6 +294,8 @@ export function ResultsTable({
                 <TableHead className="w-16">순위</TableHead>
                 <TableHead className="w-28">검색엔진</TableHead>
                 <TableHead className="w-32">키워드</TableHead>
+                <TableHead className="w-20 text-right">PC 검색수</TableHead>
+                <TableHead className="w-24 text-right">모바일 검색수</TableHead>
                 <TableHead>블로그</TableHead>
                 <TableHead className="w-36">수집일시</TableHead>
                 <TableHead className="w-16"></TableHead>
@@ -290,6 +310,12 @@ export function ResultsTable({
                 const rowBg = matchType === 'exact_url'
                   ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
                   : '';
+
+                const volume = result.keyword?.keyword ? getVolume(result.keyword.keyword) : undefined;
+                const formatVol = (v: number | string | undefined) => {
+                  if (v === undefined || v === '< 10') return v ?? '-';
+                  return Number(v).toLocaleString();
+                };
 
                 return (
                   <motion.tr
@@ -307,6 +333,12 @@ export function ResultsTable({
                     </TableCell>
                     <TableCell>
                       <span className="text-sm font-medium">{result.keyword?.keyword}</span>
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {volume ? formatVol(volume.monthlyPcQcCnt) : '-'}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {volume ? formatVol(volume.monthlyMobileQcCnt) : '-'}
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
