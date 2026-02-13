@@ -43,6 +43,9 @@ export function useCrawlResults(filters?: {
 
       let results = data as CrawlResult[];
 
+      // Filter out inactive keywords
+      results = results.filter(r => r.keyword?.is_active !== false);
+
       // Filter out AI briefing / naver internal URLs on the frontend
       results = results.filter(r => {
         if (r.blog_url.includes('m.search.naver.com') || r.blog_url.includes('search.naver.com')) return false;
