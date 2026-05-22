@@ -31,16 +31,16 @@ const POST_URL_PATTERNS = [
   /brunch\.co\.kr\/@[^/]+\/\d+/,
 ];
 
-// AI 브리핑/광고/추천 등 제외 대상 섹션의 클래스 토큰
+// AI 브리핑/광고 등 제외 대상 섹션의 클래스 토큰.
+// 주의: api_subject_bx / _fsolid_head / type_head 는 블로그 결과를 포함하므로 제외하지 않는다.
+//       지식백과(terms.naver.com)는 블로그 포스트 URL이 아니므로 isValidBlogPostUrl 단계에서 자동 제외된다.
 const EXCLUDED_CLASS_RE =
-  /(?:^|[\s"])(?:api_ai_briefing|ai_briefing|ai_answer|sc_ai|cue_|cue\b|fuser_|fusion[-_]|api_subject_bx|lb_ad|link_ad|spw_rerank|main_pack_ad|power_link|ad_section)/i;
+  /(?:^|[\s"])(?:api_ai_briefing|ai_briefing|ai_answer|sc_ai|fuser_|fusion[-_]|lb_ad|link_ad|spw_rerank|main_pack_ad|power_link|ad_section)/i;
 
-// 결과 컨테이너 셀렉터 (네이버 통합검색의 블로그 영역)
-const CONTAINER_SELECTOR = 'li.bx, div.view_wrap, div.detail_box, li.blog, div.total_wrap';
-
-// 제목 후보 앵커 셀렉터 (우선순위 순)
-const TITLE_ANCHOR_SELECTOR =
-  'a.title_link, a.api_txt_lines.total_tit, .total_tit a, .title_area a, a.title_area';
+// 블로그 포스트 링크가 담기는 후보 노드.
+// 네이버는 <a href> 외에 <button data-url="..."> 형태로도 링크를 노출한다(SDS 디자인).
+// 클래스명은 자주 바뀌므로 클래스가 아닌 href/data-url 속성 기준으로 추출한다.
+const LINK_NODE_SELECTOR = 'a[href], [data-url]';
 
 export function detectBlogPlatform(url: string): string | null {
   if (url.includes('blog.naver.com') || url.includes('m.blog.naver.com')) return '네이버블로그';
@@ -107,76 +107,74 @@ function cleanTitle(raw: string | null | undefined): string | null {
   return t;
 }
 
-// 단일 컨테이너에서 대표 블로그 게시물 1건 추출
-function extractFromContainer(container: Element): { url: string; title: string } | null {
-  // 1) 제목 앵커 우선 탐색
-  const titleAnchor = container.querySelector(TITLE_ANCHOR_SELECTOR);
-  if (titleAnchor) {
-    const href = titleAnchor.getAttribute('href') || '';
-    if (isValidBlogPostUrl(href)) {
-      return { url: href, title: cleanTitle(titleAnchor.textContent) ?? DEFAULT_TITLE };
-    }
+// markdown의 [title](url) 링크에서 url→title 맵 구성 (유효 블로그 포스트만)
+function buildMarkdownTitleMap(markdown: string): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!markdown) return map;
+  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = linkPattern.exec(markdown)) !== null) {
+    const title = cleanTitle(m[1]);
+    const url = m[2].trim();
+    if (title && isValidBlogPostUrl(url) && !map.has(url)) map.set(url, title);
   }
-
-  // 2) 컨테이너 내 모든 앵커를 순회하며 첫 유효 게시물 URL 채택
-  const anchors = Array.from(container.querySelectorAll('a')) as unknown as Element[];
-  for (const a of anchors) {
-    const href = a.getAttribute('href') || '';
-    if (!isValidBlogPostUrl(href)) continue;
-    return { url: href, title: cleanTitle(a.textContent) ?? DEFAULT_TITLE };
-  }
-
-  return null;
+  return map;
 }
 
-// rawHtml을 DOM으로 파싱해 블로그 결과를 추출. markdown으로 제목 보강.
+// rawHtml을 DOM으로 파싱해 블로그 결과를 추출.
+// href / data-url 속성에서 블로그 포스트 URL을 문서 순서대로 수집한다(클래스 비의존).
+// 제목은 노드 텍스트 → markdown → 기본값 순으로 보강한다.
 export function parseNaverIntegratedResults(markdown: string, rawHtml: string): BlogResult[] {
   const results: BlogResult[] = [];
   const addedUrls = new Set<string>();
+  const mdTitles = buildMarkdownTitleMap(markdown);
 
-  if (rawHtml) {
-    const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
-    if (doc) {
-      const containers = Array.from(doc.querySelectorAll(CONTAINER_SELECTOR)) as unknown as Element[];
+  if (!rawHtml) return results;
 
-      for (const container of containers) {
-        if (results.length >= MAX_RESULTS) break;
-        if (isInExcludedSection(container)) continue;
-
-        const extracted = extractFromContainer(container);
-        if (!extracted) continue;
-        if (addedUrls.has(extracted.url)) continue;
-
-        addedUrls.add(extracted.url);
-        results.push({
-          rank: results.length + 1,
-          title: extracted.title,
-          author: extractAuthorFromUrl(extracted.url),
-          url: extracted.url,
-          snippet: null,
-          published_date: null,
-          platform: detectBlogPlatform(extracted.url),
-          thumbnail_url: null,
-        });
-      }
-    }
+  const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
+  if (!doc) {
+    console.warn('DOMParser returned null document');
+    return results;
   }
 
-  // markdown 링크에서 제목 보강 (DOM 추출 제목이 기본값일 때)
-  if (markdown) {
-    const urlToTitle = new Map<string, string>();
-    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-    let match: RegExpExecArray | null;
-    while ((match = linkPattern.exec(markdown)) !== null) {
-      const title = cleanTitle(match[1]);
-      const url = match[2].trim();
-      if (title) urlToTitle.set(url, title);
-    }
-    for (const r of results) {
-      if (r.title === DEFAULT_TITLE) {
-        const better = urlToTitle.get(r.url);
-        if (better) r.title = better;
+  const nodes = Array.from(doc.querySelectorAll(LINK_NODE_SELECTOR)) as unknown as Element[];
+
+  for (const node of nodes) {
+    if (results.length >= MAX_RESULTS) break;
+
+    const url = node.getAttribute('href') || node.getAttribute('data-url') || '';
+    if (!isValidBlogPostUrl(url)) continue;
+    if (isInExcludedSection(node)) continue;
+
+    const nodeTitle = cleanTitle(node.textContent);
+
+    if (addedUrls.has(url)) {
+      // 이미 추가된 URL의 제목이 기본값이면 더 나은 텍스트로 교체
+      if (nodeTitle) {
+        const existing = results.find((r) => r.url === url);
+        if (existing && existing.title === DEFAULT_TITLE) existing.title = nodeTitle;
       }
+      continue;
+    }
+
+    addedUrls.add(url);
+    results.push({
+      rank: results.length + 1,
+      title: nodeTitle ?? mdTitles.get(url) ?? DEFAULT_TITLE,
+      author: extractAuthorFromUrl(url),
+      url,
+      snippet: null,
+      published_date: null,
+      platform: detectBlogPlatform(url),
+      thumbnail_url: null,
+    });
+  }
+
+  // 기본 제목 최종 보강 (markdown)
+  for (const r of results) {
+    if (r.title === DEFAULT_TITLE) {
+      const better = mdTitles.get(r.url);
+      if (better) r.title = better;
     }
   }
 

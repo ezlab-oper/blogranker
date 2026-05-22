@@ -72,6 +72,23 @@ Deno.test("정상 게시물만 추출하고 AI/광고/중복/비게시물은 제
   assertEquals(results.map((r) => r.rank), [1, 2, 3]);
 });
 
+Deno.test("data-url 속성(SDS 버튼)에서도 추출한다", () => {
+  // 네이버 신형 마크업: <button data-url="...post"> 형태
+  const html = `
+    <div>
+      <button class="sds-comps-button" data-url="https://blog.naver.com/userone/111222">옵션</button>
+      <a href="https://blog.naver.com/userone/111222">userone 블로그 글 제목</a>
+      <button class="sds-comps-button" data-url="https://blog.naver.com/usertwo/333444">옵션</button>
+    </div>`;
+  const results = parseNaverIntegratedResults("", html);
+  assertEquals(results.length, 2);
+  assertEquals(results[0].url, "https://blog.naver.com/userone/111222");
+  // a 태그 텍스트로 제목 보강
+  assertEquals(results[0].title, "userone 블로그 글 제목");
+  assertEquals(results[1].url, "https://blog.naver.com/usertwo/333444");
+  assertEquals(results[1].author, "usertwo");
+});
+
 Deno.test("플랫폼/작성자/제목을 올바르게 추출한다", () => {
   const results = parseNaverIntegratedResults("", FIXTURE_HTML);
 
