@@ -299,7 +299,7 @@ export default function Settings() {
               구글 시트 연동 (협업 블로그 목록)
             </CardTitle>
             <CardDescription>
-              협업 포스팅 URL·블로거 ID를 가져올 구글 시트를 설정합니다. 시트는 서비스 계정에 읽기 권한으로 공유되어 있어야 합니다.
+              협업 포스팅 URL·블로거 ID를 가져올 구글 시트를 설정합니다. 시트는 <strong>"링크가 있는 모든 사용자: 뷰어"</strong>로 공유되어 있어야 합니다 (별도 인증 키 불필요).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
