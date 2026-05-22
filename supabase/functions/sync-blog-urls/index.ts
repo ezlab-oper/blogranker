@@ -5,7 +5,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SPREADSHEET_ID = '1zlFFPQVJIbMvZqbFVVTZVx77F16sqrAp8D7PHBim39w';
+// 설정(settings.blogSheet)이 비어 있을 때 사용할 기본 스프레드시트 ID
+const DEFAULT_SPREADSHEET_ID = '1zlFFPQVJIbMvZqbFVVTZVx77F16sqrAp8D7PHBim39w';
+
+// 열 문자(A, E, AA...) → 0-based 인덱스
+function columnToIndex(col: string): number {
+  const c = (col || '').trim().toUpperCase();
+  if (!/^[A-Z]+$/.test(c)) return -1;
+  let idx = 0;
+  for (let i = 0; i < c.length; i++) idx = idx * 26 + (c.charCodeAt(i) - 64);
+  return idx - 1;
+}
 
 // Sheet name → program name mapping (column E)
 const SHEET_PROGRAM_MAP: Record<string, string> = {
@@ -145,13 +155,14 @@ async function getAccessToken(email: string, privateKeyPem: string): Promise<str
 
 
 
-async function fetchSheetColumn(
+// 시트 전체 행을 가져온다(헤더 포함). 행별 2차원 배열.
+async function fetchSheetRows(
   accessToken: string,
-  sheetName: string,
-  column: string = 'E'
-): Promise<string[]> {
-  const range = encodeURIComponent(`${sheetName}!${column}:${column}`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${range}`;
+  spreadsheetId: string,
+  sheetName: string
+): Promise<string[][]> {
+  const range = encodeURIComponent(sheetName);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -161,12 +172,7 @@ async function fetchSheetColumn(
     return [];
   }
   const data = await res.json();
-  const values: string[][] = data.values || [];
-  // Skip header row, filter valid URLs
-  return values
-    .slice(1)
-    .map(row => (row[0] || '').trim())
-    .filter(v => v.startsWith('http'));
+  return (data.values as string[][]) || [];
 }
 
 Deno.serve(async (req) => {
@@ -186,6 +192,18 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // 설정(settings.blogSheet)에서 시트 ID/열 구성을 읽는다
+    const { data: sheetSetting } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'blogSheet')
+      .single();
+    const cfg = (sheetSetting?.value as { spreadsheetId?: string; urlColumn?: string; blogIdColumn?: string }) || {};
+    const spreadsheetId = (cfg.spreadsheetId || '').trim() || DEFAULT_SPREADSHEET_ID;
+    const urlIdx = columnToIndex(cfg.urlColumn || 'E');
+    const blogIdIdx = columnToIndex(cfg.blogIdColumn || '');
+    if (urlIdx < 0) throw new Error(`잘못된 URL 열 설정: ${cfg.urlColumn}`);
+
     // Get access token
     const accessToken = await getAccessToken(email, privateKey);
 
@@ -193,12 +211,17 @@ Deno.serve(async (req) => {
     const allUrls: { program: string; blog_url: string; blog_id: string | null }[] = [];
 
     for (const [sheetName, program] of Object.entries(SHEET_PROGRAM_MAP)) {
-      const urls = await fetchSheetColumn(accessToken, sheetName);
-      for (const url of urls) {
+      const rows = await fetchSheetRows(accessToken, spreadsheetId, sheetName);
+      // 헤더 행 제외
+      for (const row of rows.slice(1)) {
+        const url = (row[urlIdx] || '').trim();
+        if (!url.startsWith('http')) continue;
+        // blogIdColumn이 지정되면 그 열 값 사용, 아니면 URL에서 추출
+        const sheetBlogId = blogIdIdx >= 0 ? (row[blogIdIdx] || '').trim() : '';
         allUrls.push({
           program,
           blog_url: url,
-          blog_id: extractBlogId(url),
+          blog_id: sheetBlogId || extractBlogId(url),
         });
       }
     }

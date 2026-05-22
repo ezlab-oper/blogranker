@@ -226,15 +226,19 @@ export function ResultsTable({
       </div>
 
       {/* Highlight Legend */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">범례:</span>
         <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-violet-500/20 border border-violet-500/30" />
+          공식블로그 (blog.naver.com/ezlab_official)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-emerald-500/20 border border-emerald-500/30" />
-          우리 포스팅 (URL 일치)
+          협업 포스팅 (URL 일치)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-sky-500/20 border border-sky-500/30" />
-          우리 블로거 (블로그 ID 일치)
+          협업 블로거 (블로그 ID 일치)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-muted border" />
@@ -291,7 +295,9 @@ export function ResultsTable({
                   ? getMatchType(result.blog_url, result.keyword?.program || null, matchers)
                   : 'none';
 
-                const rowBg = matchType === 'exact_url'
+                const rowBg = matchType === 'official_blog'
+                  ? 'bg-violet-500/10 hover:bg-violet-500/15'
+                  : matchType === 'exact_url'
                   ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
                   : '';
 
@@ -328,12 +334,18 @@ export function ResultsTable({
                       <div className="space-y-1">
                         <p className={cn(
                           "font-medium text-sm line-clamp-1",
+                          matchType === 'official_blog' && "text-violet-700 dark:text-violet-400",
                           matchType === 'exact_url' && "text-emerald-700 dark:text-emerald-400"
                         )}>
                           {result.blog_title}
+                          {matchType === 'official_blog' && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-500/20 text-violet-700 dark:text-violet-300">
+                              공식블로그
+                            </span>
+                          )}
                           {matchType === 'exact_url' && (
                             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                              우리 포스팅
+                              협업 포스팅
                             </span>
                           )}
                         </p>
@@ -346,7 +358,7 @@ export function ResultsTable({
                               <User className="w-3 h-3" />
                               {result.blog_author}
                               {matchType === 'same_blog_id' && (
-                                <span className="text-[10px] ml-1">우리 블로거</span>
+                                <span className="text-[10px] ml-1">협업 블로거</span>
                               )}
                             </span>
                           )}

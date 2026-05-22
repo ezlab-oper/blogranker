@@ -109,7 +109,11 @@ export function buildBlogUrlMatchers(blogUrls: BlogUrl[]) {
   return { urlSet, blogIdsByProgram, urlsByProgram };
 }
 
-export type MatchType = 'exact_url' | 'same_blog_id' | 'none';
+// 이지랩 공식 블로그 (프로그램 무관하게 항상 '공식블로그'로 표기)
+export const OFFICIAL_BLOG_ID = 'ezlab_official';
+export const OFFICIAL_BLOG_URL = 'https://blog.naver.com/ezlab_official';
+
+export type MatchType = 'official_blog' | 'exact_url' | 'same_blog_id' | 'none';
 
 export function getMatchType(
   resultUrl: string,
@@ -117,15 +121,18 @@ export function getMatchType(
   matchers: ReturnType<typeof buildBlogUrlMatchers>
 ): MatchType {
   const { urlsByProgram, blogIdsByProgram } = matchers;
+  const resultBlogId = extractBlogId(resultUrl);
 
-  // Check exact URL match (within the same program), also try normalized URL
+  // 공식블로그: 프로그램과 무관하게 최우선 판정
+  if (resultBlogId === OFFICIAL_BLOG_ID) return 'official_blog';
+
+  // 협업 포스팅: 같은 프로그램 내 URL 정확 일치 (정규화 포함)
   if (resultProgram) {
     const programUrls = urlsByProgram.get(resultProgram);
     if (programUrls?.has(resultUrl) || programUrls?.has(normalizeUrl(resultUrl))) return 'exact_url';
   }
 
-  // Check blog ID match (same blog author, different post)
-  const resultBlogId = extractBlogId(resultUrl);
+  // 협업 블로거: 같은 프로그램 내 같은 블로거 ID (다른 글)
   if (resultBlogId && resultProgram) {
     const programBlogIds = blogIdsByProgram.get(resultProgram);
     if (programBlogIds?.has(resultBlogId)) return 'same_blog_id';

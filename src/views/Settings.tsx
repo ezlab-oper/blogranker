@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Calendar } from 'lucide-react';
+import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Calendar, FileSpreadsheet } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -287,6 +287,67 @@ export default function Settings() {
                 }))}
                 className="data-[state=checked]:bg-success" 
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Google Sheet Integration */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              구글 시트 연동 (협업 블로그 목록)
+            </CardTitle>
+            <CardDescription>
+              협업 포스팅 URL·블로거 ID를 가져올 구글 시트를 설정합니다. 시트는 서비스 계정에 읽기 권한으로 공유되어 있어야 합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="sheet-id">스프레드시트 ID</Label>
+              <Input
+                id="sheet-id"
+                type="text"
+                placeholder="구글 시트 URL의 /d/ 와 /edit 사이 값"
+                value={localSettings.blogSheet.spreadsheetId}
+                onChange={(e) => setLocalSettings(prev => ({
+                  ...prev,
+                  blogSheet: { ...prev.blogSheet, spreadsheetId: e.target.value.trim() }
+                }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                예: https://docs.google.com/spreadsheets/d/<strong>1zlFFPQ...39w</strong>/edit
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sheet-url-col">협업 포스팅 URL 열</Label>
+                <Input
+                  id="sheet-url-col"
+                  type="text"
+                  placeholder="E"
+                  value={localSettings.blogSheet.urlColumn}
+                  onChange={(e) => setLocalSettings(prev => ({
+                    ...prev,
+                    blogSheet: { ...prev.blogSheet, urlColumn: e.target.value.trim().toUpperCase() }
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">포스팅 URL이 있는 열 문자 (예: E)</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sheet-blogid-col">블로그 ID 열 (선택)</Label>
+                <Input
+                  id="sheet-blogid-col"
+                  type="text"
+                  placeholder="비우면 URL에서 자동 추출"
+                  value={localSettings.blogSheet.blogIdColumn}
+                  onChange={(e) => setLocalSettings(prev => ({
+                    ...prev,
+                    blogSheet: { ...prev.blogSheet, blogIdColumn: e.target.value.trim().toUpperCase() }
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground">블로그 ID가 있는 열 문자. 비우면 URL에서 추출</p>
+              </div>
             </div>
           </CardContent>
         </Card>
