@@ -6,7 +6,6 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ResultsTable } from '@/components/results/ResultsTable';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { useApiTracking } from '@/hooks/useApiTracking';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +14,6 @@ import { useSyncBlogUrls } from '@/hooks/useBlogUrls';
 import { cn } from '@/lib/utils';
 
 export default function Results() {
-  useApiTracking('results');
   const { canPerformActions } = useAuth();
   const { data: keywords } = useKeywords();
   const { toast } = useToast();

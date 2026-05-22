@@ -7,14 +7,12 @@ import { KeywordDialog } from '@/components/keywords/KeywordDialog';
 import { KeywordFilterBar } from '@/components/keywords/KeywordFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useApiTracking } from '@/hooks/useApiTracking';
 import { useAuth } from '@/contexts/AuthContext';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import type { Keyword, KeywordCategory } from '@/types/database';
 
 export default function Keywords() {
-  useApiTracking('keywords');
   const { canPerformActions } = useAuth();
   const { data: keywords } = useKeywords();
   const { data: searchVolumeData, isLoading: isLoadingVolume, fetchedAt, fetchSearchVolume } = useKeywordSearchVolume();

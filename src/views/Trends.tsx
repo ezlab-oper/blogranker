@@ -1,10 +1,8 @@
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { RankTrendChart } from '@/components/trends/RankTrendChart';
-import { useApiTracking } from '@/hooks/useApiTracking';
 
 export default function Trends() {
-  useApiTracking('trends');
   return (
     <AppLayout>
       <div className="space-y-6">

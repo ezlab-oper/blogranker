@@ -10,7 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useStatistics, DateRange } from '@/hooks/useStatistics';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useApiTracking } from '@/hooks/useApiTracking';
 import {
   BarChart3,
   TrendingUp,
@@ -247,7 +246,6 @@ function LoadingSkeleton() {
 }
 
 export default function Statistics() {
-  useApiTracking('statistics');
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [activePreset, setActivePreset] = useState<PresetKey>('all');

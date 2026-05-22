@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { useSettings, type AllSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useApiTracking } from '@/hooks/useApiTracking';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +25,6 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
-  useApiTracking('settings');
   
   const { settings, isLoading, updateSettings, isUpdating, timeToCronExpression } = useSettings();
   const { toast } = useToast();
