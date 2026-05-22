@@ -1,73 +1,51 @@
-# Welcome to your Lovable project
+# Blog Rank Tracker
 
-## Project info
+네이버 통합검색에서 키워드별 블로그 노출 순위를 추적하는 내부 관리자 도구.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 기술 스택
 
-## How can I edit this code?
+- **프레임워크**: Next.js 14 (App Router, CSR 중심)
+- **언어/UI**: TypeScript, React 18, shadcn/ui (Radix), TailwindCSS
+- **상태/데이터**: TanStack Query
+- **백엔드**: Supabase (Postgres + Auth + Edge Functions)
+- **크롤링**: Firecrawl API → 네이버 검색 HTML 파싱 (deno-dom)
+- **배포**: Netlify (`@netlify/plugin-nextjs`)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## 로컬 실행
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-**Edit a file directly in GitHub**
+`.env` 에 다음 값이 필요하다:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+NEXT_PUBLIC_SUPABASE_PROJECT_ID=...
+```
 
-**Use GitHub Codespaces**
+## 스크립트
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| 명령 | 설명 |
+|------|------|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 프로덕션 빌드 |
+| `npm run start` | 빌드 결과 실행 |
+| `npm run lint` | ESLint (next/core-web-vitals) |
+| `npm run test` | Vitest |
 
-## What technologies are used for this project?
+## Netlify 배포
 
-This project is built with:
+저장소를 Netlify에 연결하면 `netlify.toml` 설정으로 자동 빌드된다.
+환경변수(`NEXT_PUBLIC_*`)는 Netlify 사이트 설정 > Environment variables 에 등록한다.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 구조
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `src/app/` — Next.js App Router (라우트 = 얇은 래퍼, 인증 가드 `ProtectedRoute` 적용)
+- `src/views/` — 실제 페이지 화면 컴포넌트
+- `src/components/` — UI 및 기능 컴포넌트
+- `src/hooks/`, `src/lib/`, `src/contexts/` — 데이터 훅·유틸·인증 컨텍스트
+- `supabase/functions/` — Edge Functions (Deno): 크롤링·키워드 검색량·스케줄
+- `supabase/migrations/` — DB 스키마 및 RLS 정책

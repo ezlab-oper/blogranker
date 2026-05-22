@@ -1,5 +1,7 @@
+'use client';
+
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Tag, ChevronRight, Power, PowerOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +36,7 @@ export function KeywordOverview() {
     <Card className="shadow-card">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
         <CardTitle className="text-lg">키워드 현황</CardTitle>
-        <Link to="/keywords">
+        <Link href="/keywords">
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
             전체보기 <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
@@ -45,7 +47,7 @@ export function KeywordOverview() {
           <div className="text-center py-8 text-muted-foreground">
             <Tag className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>등록된 키워드가 없습니다.</p>
-            <Link to="/keywords">
+            <Link href="/keywords">
               <Button variant="link" size="sm" className="mt-2">
                 키워드 추가하기
               </Button>

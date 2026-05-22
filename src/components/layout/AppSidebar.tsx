@@ -1,5 +1,8 @@
+'use client';
+
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -36,13 +39,13 @@ const allNavItems = [
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const pathname = usePathname();
+  const router = useRouter();
   const { user, role, signOut, canAccessSettings, canManageAdmins, canUseFeatures } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/login');
+    router.push('/login');
   };
 
   // Filter nav items based on permissions
@@ -88,12 +91,12 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = pathname === item.path;
           const Icon = item.icon;
 
           const linkContent = (
             <Link
-              to={item.path}
+              href={item.path}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
                 isActive

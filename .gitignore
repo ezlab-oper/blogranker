@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Next.js
+.next
+out
+.netlify
+next-env.d.ts
+
+# env (Netlify 대시보드에 등록 — 저장소에 커밋하지 않음)
+.env
+.env*.local
+
+# Supabase CLI 로컬 상태
+supabase/.temp
+supabase/.branches
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

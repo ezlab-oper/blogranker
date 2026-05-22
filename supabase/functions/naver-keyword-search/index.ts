@@ -8,21 +8,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-function generateSignature(
-  timestamp: string,
-  method: string,
-  uri: string,
-  secretKey: string
-): string {
-  const message = `${timestamp}.${method}.${uri}`;
-  const encoder = new TextEncoder();
-  const key = encoder.encode(secretKey);
-  const msg = encoder.encode(message);
-
-  // Use Web Crypto API for HMAC-SHA256
-  return "";
-}
-
 async function generateSignatureAsync(
   timestamp: string,
   method: string,
@@ -67,8 +52,6 @@ serve(async (req) => {
       CUSTOMER_ID = CUSTOMER_ID.split("=").pop()!.trim();
     }
 
-    console.log("Debug - CUSTOMER_ID:", JSON.stringify(CUSTOMER_ID));
-
     if (!API_KEY || !SECRET_KEY || !CUSTOMER_ID) {
       return new Response(
         JSON.stringify({ error: "Missing API credentials", hasApiKey: !!API_KEY, hasSecret: !!SECRET_KEY, hasCustomerId: !!CUSTOMER_ID }),
@@ -87,8 +70,6 @@ serve(async (req) => {
     const cleanedKeywords = keywords.map((k: string) => k.replace(/\s+/g, ""));
     const encodedKeywords = cleanedKeywords.map((k: string) => encodeURIComponent(k)).join(",");
     const queryString = `hintKeywords=${encodedKeywords}&showDetail=1`;
-
-    console.log("Final URL:", `${BASE_URL}${uri}?${queryString}`);
 
     const response = await fetch(`${BASE_URL}${uri}?${queryString}`, {
       method: "GET",

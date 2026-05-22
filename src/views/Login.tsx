@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Search, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,14 +16,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { signIn, user, role, isLoading } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Redirect if already logged in with role
   useEffect(() => {
     if (user && role && !isLoading) {
-      navigate('/');
+      router.replace('/');
     }
-  }, [user, role, isLoading, navigate]);
+  }, [user, role, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +45,7 @@ export default function Login() {
 
     if (success) {
       toast.success('로그인되었습니다.');
-      navigate('/');
+      router.replace('/');
     }
     
     setIsSubmitting(false);
