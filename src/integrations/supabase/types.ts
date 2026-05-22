@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -245,6 +245,21 @@ export type Database = {
         }
         Relationships: []
       }
+      ranker: {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
       search_engines: {
         Row: {
           base_url: string
@@ -296,48 +311,6 @@ export type Database = {
         }
         Relationships: []
       }
-      usage_logs: {
-        Row: {
-          api_requests: number | null
-          api_requests_by_feature: Json | null
-          bandwidth_mb: number | null
-          created_at: string
-          database_rows: number | null
-          database_size_mb: number | null
-          date: string
-          edge_function_invocations: number | null
-          id: string
-          storage_size_mb: number | null
-          updated_at: string
-        }
-        Insert: {
-          api_requests?: number | null
-          api_requests_by_feature?: Json | null
-          bandwidth_mb?: number | null
-          created_at?: string
-          database_rows?: number | null
-          database_size_mb?: number | null
-          date: string
-          edge_function_invocations?: number | null
-          id?: string
-          storage_size_mb?: number | null
-          updated_at?: string
-        }
-        Update: {
-          api_requests?: number | null
-          api_requests_by_feature?: Json | null
-          bandwidth_mb?: number | null
-          created_at?: string
-          database_rows?: number | null
-          database_size_mb?: number | null
-          date?: string
-          edge_function_invocations?: number | null
-          id?: string
-          storage_size_mb?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           created_at: string
@@ -367,7 +340,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_database_stats: { Args: never; Returns: Json }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -379,6 +351,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_editor: { Args: { _uid: string }; Returns: boolean }
+      is_master: { Args: { _uid: string }; Returns: boolean }
       schedule_cron_job: {
         Args: {
           auth_token: string
