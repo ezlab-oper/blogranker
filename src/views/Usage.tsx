@@ -163,7 +163,7 @@ export default function Usage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">사용량 모니터링</h1>
             <p className="text-muted-foreground mt-1">
-              Lovable Cloud 리소스 사용량을 확인하세요
+              리소스 사용량을 확인하세요
             </p>
           </div>
           <div className="flex items-center gap-3">
