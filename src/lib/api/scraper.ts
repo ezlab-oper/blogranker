@@ -140,12 +140,15 @@ export async function runCrawlJob(
       }
 
       try {
-        // Only Naver is supported now
-        if (engine.name !== '네이버') {
+        // 엔진명 → 타입 매핑 (네이버/구글 지원)
+        const engineType: 'naver' | 'google' | null =
+          engine.name === '네이버' ? 'naver'
+          : engine.name === '구글' ? 'google'
+          : null;
+        if (!engineType) {
           processed++;
           continue;
         }
-        const engineType = 'naver' as const;
         
         // Report progress before starting
         onProgress?.({

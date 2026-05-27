@@ -1,4 +1,5 @@
 import { parseNaverIntegratedResults } from "./parser.ts";
+import { parseGoogleResults } from "./parser_google.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const keyword: string = body.keyword;
+    const engine: 'naver' | 'google' = body.engine === 'google' ? 'google' : 'naver';
 
     if (!keyword) {
       return new Response(
@@ -30,10 +32,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 네이버 통합검색
-    const searchUrl = `https://search.naver.com/search.naver?ie=UTF-8&query=${encodeURIComponent(keyword)}&sm=chr_hty`;
+    // 엔진별 검색 URL (1페이지만)
+    const searchUrl = engine === 'google'
+      ? `https://www.google.com/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=kr&num=10`
+      : `https://search.naver.com/search.naver?ie=UTF-8&query=${encodeURIComponent(keyword)}&sm=chr_hty`;
 
-    console.log(`Scraping naver for keyword: ${keyword}`);
+    console.log(`Scraping ${engine} for keyword: ${keyword}`);
+
+    // Firecrawl 요청. 구글은 봇 탐지가 강해 location(KR) + mobile UA를 추가한다.
+    const firecrawlBody: Record<string, unknown> = {
+      url: searchUrl,
+      formats: ['markdown', 'rawHtml'],
+      onlyMainContent: false,
+      waitFor: 5000,
+    };
+    if (engine === 'google') {
+      firecrawlBody.location = { country: 'KR', languages: ['ko-KR'] };
+      firecrawlBody.mobile = true;
+    }
 
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
@@ -41,12 +57,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        url: searchUrl,
-        formats: ['markdown', 'rawHtml'],
-        onlyMainContent: false,
-        waitFor: 5000,
-      }),
+      body: JSON.stringify(firecrawlBody),
     });
 
     const data = await response.json();
@@ -62,15 +73,17 @@ Deno.serve(async (req) => {
     const markdown: string = data.data?.markdown || data.markdown || '';
     const rawHtml: string = data.data?.rawHtml || data.rawHtml || '';
 
-    const blogResults = parseNaverIntegratedResults(markdown, rawHtml);
+    const blogResults = engine === 'google'
+      ? parseGoogleResults(markdown, rawHtml)
+      : parseNaverIntegratedResults(markdown, rawHtml);
 
-    console.log(`Found ${blogResults.length} blog results from integrated search`);
+    console.log(`Found ${blogResults.length} blog results (${engine})`);
 
     return new Response(
       JSON.stringify({
         success: true,
         keyword,
-        engine: 'naver',
+        engine,
         results: blogResults,
         raw_markdown: markdown.substring(0, 3000),
       }),

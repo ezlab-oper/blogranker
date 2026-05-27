@@ -154,11 +154,14 @@ Deno.serve(async (req) => {
           // Random delay between requests (3-7 seconds)
           await randomDelay(3000, 7000);
 
-          const engineType = engine.name.toLowerCase().includes('네이버') || engine.name.toLowerCase().includes('naver') ? 'naver' : null;
-          
-          // Skip non-Naver engines
+          // 엔진명 → 타입 매핑 (네이버/구글 지원)
+          const lname = engine.name.toLowerCase();
+          const engineType: 'naver' | 'google' | null =
+            engine.name === '네이버' || lname.includes('naver') ? 'naver'
+            : engine.name === '구글' || lname.includes('google') ? 'google'
+            : null;
           if (!engineType) {
-            console.log(`Skipping non-Naver engine: ${engine.name}`);
+            console.log(`Skipping unsupported engine: ${engine.name}`);
             continue;
           }
 

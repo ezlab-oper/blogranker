@@ -37,7 +37,7 @@ type NavItem = {
 const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: '대시보드', path: '/', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: Tags, label: '키워드 관리', path: '/keywords', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
-  { icon: FileText, label: '수집 결과', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
+  { icon: FileText, label: '키워드 수집', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   {
