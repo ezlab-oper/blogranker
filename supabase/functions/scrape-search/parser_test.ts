@@ -54,22 +54,22 @@ const FIXTURE_HTML = `
 Deno.test("정상 게시물만 추출하고 AI/광고/중복/비게시물은 제외한다", () => {
   const results = parseNaverIntegratedResults("", FIXTURE_HTML);
 
-  // 정상 3건만
-  assertEquals(results.length, 3);
+  // 네이버블로그 + 티스토리만 통과 (velog는 도메인 화이트리스트에 없어 제외)
+  assertEquals(results.length, 2);
 
   const urls = results.map((r) => r.url);
   assertEquals(urls, [
     "https://blog.naver.com/realuser/123456",
     "https://hong.tistory.com/entry/seoul-cafe",
-    "https://velog.io/@devkim/nextjs-migration",
   ]);
 
-  // AI/광고 글이 섞이지 않았는지
+  // AI/광고/velog 모두 제외
   assertEquals(urls.includes("https://blog.naver.com/aibot/99999"), false);
   assertEquals(urls.includes("https://blog.naver.com/adcorp/11111"), false);
+  assertEquals(urls.includes("https://velog.io/@devkim/nextjs-migration"), false);
 
   // rank는 1부터 순차
-  assertEquals(results.map((r) => r.rank), [1, 2, 3]);
+  assertEquals(results.map((r) => r.rank), [1, 2]);
 });
 
 Deno.test("data-url 속성(SDS 버튼)에서도 추출한다", () => {
@@ -98,9 +98,6 @@ Deno.test("플랫폼/작성자/제목을 올바르게 추출한다", () => {
 
   assertEquals(results[1].platform, "티스토리");
   assertEquals(results[1].author, "hong");
-
-  assertEquals(results[2].platform, "Velog");
-  assertEquals(results[2].author, "devkim");
 });
 
 Deno.test("markdown으로 기본 제목을 보강한다", () => {

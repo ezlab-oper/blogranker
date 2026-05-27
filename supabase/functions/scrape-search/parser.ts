@@ -14,8 +14,8 @@ export interface BlogResult {
 const MAX_RESULTS = 10;
 const DEFAULT_TITLE = '블로그 포스트';
 
-// 블로그 도메인 및 게시물 URL 패턴
-const BLOG_DOMAINS = ['blog.naver.com', 'm.blog.naver.com', 'tistory.com', 'velog.io', 'brunch.co.kr'];
+// 수집 대상 블로그 도메인 (네이버블로그 + 티스토리만)
+const BLOG_DOMAINS = ['blog.naver.com', 'm.blog.naver.com', 'tistory.com'];
 const EXCLUDE_URL_PATTERNS = [
   'PostList.naver', 'BlogHome.naver', 'MyBlog.naver',
   'section.blog.naver.com', 'nid.naver.com', 'help.naver.com',
@@ -27,8 +27,6 @@ const POST_URL_PATTERNS = [
   /blog\.naver\.com\/PostView\.(nhn|naver)\?/,
   /tistory\.com\/\d+/,
   /tistory\.com\/entry\//,
-  /velog\.io\/@[^/]+\/[^/?]+/,
-  /brunch\.co\.kr\/@[^/]+\/\d+/,
 ];
 
 // AI 브리핑/광고 등 제외 대상 섹션의 클래스 토큰.

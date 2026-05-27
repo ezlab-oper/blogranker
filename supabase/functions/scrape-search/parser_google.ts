@@ -13,15 +13,6 @@ const DEFAULT_TITLE = '블로그 포스트';
 const EXCLUDED_CLASS_RE =
   /(?:^|[\s"])(?:commercial-unit-desktop-top|commercial-unit|ads-ad|ads-fr|ad-side|kp-blk|knowledge-panel|related-question-pair)/i;
 
-// 구글 결과에서 수집할 도메인 화이트리스트(요청사항: 네이버블로그 + 티스토리만)
-// isValidBlogPostUrl이 통과시키더라도 이 목록에 포함되지 않으면 제외한다.
-function isAllowedGoogleDomain(url: string): boolean {
-  return (
-    url.includes('blog.naver.com') ||
-    url.includes('m.blog.naver.com') ||
-    url.includes('.tistory.com')
-  );
-}
 
 // 구글 검색 결과 1페이지 파서.
 // 전략: a[href]에서 블로그 포스트 URL 추출(클래스 비의존). `/url?q=` 리다이렉트 해석 포함.
@@ -93,7 +84,6 @@ export function parseGoogleResults(_markdown: string, rawHtml: string): BlogResu
     const raw = a.getAttribute('href') || '';
     const url = resolveGoogleHref(raw);
     if (!isValidBlogPostUrl(url)) continue;
-    if (!isAllowedGoogleDomain(url)) continue; // 네이버블로그 + 티스토리만
     if (isInExcludedSection(a)) continue;
     if (addedUrls.has(url)) continue;
 
