@@ -144,6 +144,9 @@ export default function AdminManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="master">
+                        {ROLE_PERMISSIONS.master.label}
+                      </SelectItem>
                       <SelectItem value="admin">
                         {ROLE_PERMISSIONS.admin.label}
                       </SelectItem>

@@ -59,10 +59,10 @@ serve(async (req) => {
       );
     }
 
-    // Cannot create master via API (only via direct DB for first master)
-    if (role === "master") {
+    // 허용된 역할만 통과 (요청자는 이미 master로 검증됨 — master가 master를 만드는 것 허용)
+    if (role !== "master" && role !== "admin" && role !== "viewer") {
       return new Response(
-        JSON.stringify({ error: "Cannot create master admin via API" }),
+        JSON.stringify({ error: `Invalid role: ${role}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
