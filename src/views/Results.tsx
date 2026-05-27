@@ -25,6 +25,7 @@ export default function Results() {
   // Lifted filter state shared with ResultsTable
   const [selectedProgram, setSelectedProgram] = useState('');
   const [selectedKeywordId, setSelectedKeywordId] = useState('');
+  const [selectedEngine, setSelectedEngine] = useState('');
 
   // Determine which keywords to crawl based on filters
   const crawlTargets = useMemo(() => {
@@ -179,6 +180,8 @@ export default function Results() {
           onSelectedProgramChange={setSelectedProgram}
           selectedKeywordId={selectedKeywordId}
           onSelectedKeywordIdChange={setSelectedKeywordId}
+          selectedEngine={selectedEngine}
+          onSelectedEngineChange={setSelectedEngine}
         />
       </div>
     </AppLayout>

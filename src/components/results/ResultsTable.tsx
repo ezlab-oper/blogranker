@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCrawlResults } from '@/hooks/useCrawlResults';
+import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useBlogUrls, buildBlogUrlMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
 import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
@@ -50,6 +50,8 @@ interface ResultsTableProps {
   onSelectedProgramChange: (v: string) => void;
   selectedKeywordId: string;
   onSelectedKeywordIdChange: (v: string) => void;
+  selectedEngine: string;
+  onSelectedEngineChange: (v: string) => void;
 }
 
 export function ResultsTable({
@@ -58,6 +60,8 @@ export function ResultsTable({
   onSelectedProgramChange,
   selectedKeywordId,
   onSelectedKeywordIdChange,
+  selectedEngine,
+  onSelectedEngineChange,
 }: ResultsTableProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +72,7 @@ export function ResultsTable({
   });
   const { data: allKeywords } = useKeywords();
   const { data: blogUrls } = useBlogUrls();
+  const { data: searchEngines } = useSearchEngines();
   const { getVolume } = useKeywordSearchVolume();
 
   // Build URL matchers for highlighting
@@ -83,13 +88,19 @@ export function ResultsTable({
     return allKeywords.filter(kw => kw.program === selectedProgram);
   }, [allKeywords, selectedProgram]);
 
-  // Sort: Naver first, then by rank ascending (1→10)
-  const sortedResults = results ? [...results].sort((a, b) => {
-    const aIsNaver = a.search_engine?.name === '네이버' ? 0 : 1;
-    const bIsNaver = b.search_engine?.name === '네이버' ? 0 : 1;
-    if (aIsNaver !== bIsNaver) return aIsNaver - bIsNaver;
-    return a.rank - b.rank;
-  }) : undefined;
+  // 엔진 필터 → 정렬(네이버 우선, rank 오름차순)
+  const sortedResults = useMemo(() => {
+    if (!results) return undefined;
+    const filtered = selectedEngine
+      ? results.filter((r) => r.search_engine?.name === selectedEngine)
+      : results;
+    return [...filtered].sort((a, b) => {
+      const aIsNaver = a.search_engine?.name === '네이버' ? 0 : 1;
+      const bIsNaver = b.search_engine?.name === '네이버' ? 0 : 1;
+      if (aIsNaver !== bIsNaver) return aIsNaver - bIsNaver;
+      return a.rank - b.rank;
+    });
+  }, [results, selectedEngine]);
 
   // Pagination logic
   const totalItems = sortedResults?.length || 0;
@@ -204,11 +215,33 @@ export function ResultsTable({
           </SelectContent>
         </Select>
 
+        {/* Search engine filter */}
+        <Select
+          value={selectedEngine || 'all'}
+          onValueChange={(v) => {
+            onSelectedEngineChange(v === 'all' ? '' : v);
+            setCurrentPage(1);
+          }}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="검색엔진" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover">
+            <SelectItem value="all">전체 엔진</SelectItem>
+            {(searchEngines || []).map((eng) => (
+              <SelectItem key={eng.id} value={eng.name}>
+                {eng.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Button
           variant="outline"
           onClick={() => {
             onSelectedProgramChange('');
             onSelectedKeywordIdChange('');
+            onSelectedEngineChange('');
             setCurrentPage(1);
           }}
         >
