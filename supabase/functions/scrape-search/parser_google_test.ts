@@ -48,19 +48,20 @@ const FIXTURE = `
 </body></html>
 `;
 
-Deno.test("organic 블로그 결과만 추출하고 광고/지식패널/중복/비-블로그는 제외", () => {
+Deno.test("네이버블로그+티스토리만 추출하고 velog/광고/지식패널/중복/비-블로그는 제외", () => {
   const results = parseGoogleResults("", FIXTURE);
   const urls = results.map((r) => r.url);
 
-  assertEquals(results.length, 3);
+  assertEquals(results.length, 2);
   assertEquals(urls, [
     "https://blog.naver.com/realuser/12345",
     "https://hong.tistory.com/entry/seoul-cafe",
-    "https://velog.io/@devkim/nextjs-migration",
   ]);
+  // velog/광고/지식패널 모두 제외
+  assertEquals(urls.includes("https://velog.io/@devkim/nextjs-migration"), false);
   assertEquals(urls.includes("https://blog.naver.com/adcorp/9999"), false);
   assertEquals(urls.includes("https://blog.naver.com/wiki/777"), false);
-  assertEquals(results.map((r) => r.rank), [1, 2, 3]);
+  assertEquals(results.map((r) => r.rank), [1, 2]);
 });
 
 Deno.test("플랫폼/작성자/제목 추출", () => {
@@ -72,9 +73,6 @@ Deno.test("플랫폼/작성자/제목 추출", () => {
   assertEquals(results[1].platform, "티스토리");
   assertEquals(results[1].author, "hong");
   assertEquals(results[1].title, "서울 카페 후기");
-
-  assertEquals(results[2].platform, "Velog");
-  assertEquals(results[2].author, "devkim");
 });
 
 Deno.test("/url?q= 리다이렉트가 디코드되어 실제 URL로 풀린다", () => {
