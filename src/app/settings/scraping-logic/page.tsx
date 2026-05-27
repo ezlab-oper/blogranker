@@ -5,7 +5,7 @@ import ScrapingLogicMap from '@/views/ScrapingLogicMap';
 
 export default function Page() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireSettings>
       <ScrapingLogicMap />
     </ProtectedRoute>
   );

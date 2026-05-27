@@ -24,15 +24,34 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_PERMISSIONS } from '@/types/auth';
 
-const allNavItems = [
+type NavItem = {
+  icon: typeof LayoutDashboard;
+  label: string;
+  path: string;
+  requireFeatures: boolean;
+  requireSettings: boolean;
+  requireAdminManagement: boolean;
+  children?: { icon: typeof LayoutDashboard; label: string; path: string }[];
+};
+
+const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: '대시보드', path: '/', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: Tags, label: '키워드 관리', path: '/keywords', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: FileText, label: '수집 결과', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
-  { icon: Map, label: '스크래핑 로직 맵', path: '/scraping-logic', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
-  { icon: Users, label: '관리자', path: '/admin-management', requireFeatures: false, requireSettings: false, requireAdminManagement: true },
-  { icon: Settings, label: '설정', path: '/settings', requireFeatures: false, requireSettings: true, requireAdminManagement: false },
+  {
+    icon: Settings,
+    label: '설정',
+    path: '/settings',
+    requireFeatures: false,
+    requireSettings: true,
+    requireAdminManagement: false,
+    children: [
+      { icon: Users, label: '관리자', path: '/settings/admin-management' },
+      { icon: Map, label: '스크래핑 로직 맵', path: '/settings/scraping-logic' },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -89,7 +108,10 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = pathname === item.path;
+          // 부모는 정확 일치 OR 자식 경로의 prefix일 때 활성
+          const isActive =
+            pathname === item.path ||
+            (!!item.children && pathname.startsWith(item.path + '/'));
           const Icon = item.icon;
 
           const linkContent = (
@@ -113,18 +135,77 @@ export function AppSidebar() {
             </Link>
           );
 
-          if (collapsed) {
-            return (
-              <Tooltip key={item.path} delayDuration={0}>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                <TooltipContent side="right" className="font-medium">
-                  {item.label}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
+          const parentRow = collapsed ? (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+              <TooltipContent side="right" className="font-medium">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            linkContent
+          );
 
-          return <div key={item.path}>{linkContent}</div>;
+          // 자식 메뉴 렌더 (펼쳐진 사이드바에서만 노출, 들여쓰기)
+          const childRows =
+            item.children && !collapsed
+              ? item.children.map((child) => {
+                  const ChildIcon = child.icon;
+                  const childActive = pathname === child.path;
+                  return (
+                    <Link
+                      key={child.path}
+                      href={child.path}
+                      className={cn(
+                        'flex items-center gap-3 pl-10 pr-3 py-2 rounded-lg transition-all duration-200 text-sm',
+                        childActive
+                          ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                          : 'text-sidebar-foreground/80 hover:bg-sidebar-accent'
+                      )}
+                    >
+                      <ChildIcon className="w-4 h-4 flex-shrink-0" />
+                      <span className="font-medium whitespace-nowrap">{child.label}</span>
+                    </Link>
+                  );
+                })
+              : null;
+
+          // 접힌 상태에서도 자식이 직접 활성이면 아이콘 단독으로 접근 가능하게 노출
+          const collapsedChildIcons =
+            item.children && collapsed
+              ? item.children.map((child) => {
+                  const ChildIcon = child.icon;
+                  const childActive = pathname === child.path;
+                  return (
+                    <Tooltip key={child.path} delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href={child.path}
+                          className={cn(
+                            'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-all duration-200',
+                            childActive
+                              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                              : 'text-sidebar-foreground/80 hover:bg-sidebar-accent'
+                          )}
+                        >
+                          <ChildIcon className="w-4 h-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="font-medium">
+                        {child.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })
+              : null;
+
+          return (
+            <div key={item.path} className={item.children && !collapsed ? 'space-y-1' : undefined}>
+              {parentRow}
+              {childRows}
+              {collapsedChildIcons}
+            </div>
+          );
         })}
       </nav>
 
