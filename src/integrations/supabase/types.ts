@@ -41,6 +41,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bloggers: {
+        Row: {
+          blog_grade: Database["public"]["Enums"]["blog_grade"] | null
+          blog_id: string | null
+          blog_url: string
+          contract_end_date: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_influencer: boolean | null
+          memo: string | null
+          name: string
+          status: Database["public"]["Enums"]["blogger_status"] | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          blog_grade?: Database["public"]["Enums"]["blog_grade"] | null
+          blog_id?: string | null
+          blog_url: string
+          contract_end_date?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_influencer?: boolean | null
+          memo?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["blogger_status"] | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          blog_grade?: Database["public"]["Enums"]["blog_grade"] | null
+          blog_id?: string | null
+          blog_url?: string
+          contract_end_date?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_influencer?: boolean | null
+          memo?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["blogger_status"] | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       crawl_jobs: {
         Row: {
           completed_at: string | null
@@ -218,6 +266,44 @@ export type Database = {
           },
         ]
       }
+      postings: {
+        Row: {
+          blog_id: string | null
+          blogger_id: string | null
+          created_at: string
+          id: string
+          posting_url: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          blog_id?: string | null
+          blogger_id?: string | null
+          created_at?: string
+          id?: string
+          posting_url: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          blog_id?: string | null
+          blogger_id?: string | null
+          created_at?: string
+          id?: string
+          posting_url?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "postings_blogger_id_fkey"
+            columns: ["blogger_id"]
+            isOneToOne: false
+            referencedRelation: "bloggers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -366,6 +452,24 @@ export type Database = {
     }
     Enums: {
       app_role: "master" | "admin" | "viewer"
+      blog_grade:
+        | "최적화3"
+        | "최적화2"
+        | "최적화1"
+        | "준최적6"
+        | "준최적5"
+        | "준최적4"
+        | "준최적3"
+        | "준최적2"
+        | "준최적1"
+        | "일반"
+        | "저품질"
+      blogger_status:
+        | "협의중"
+        | "회신대기"
+        | "계약중"
+        | "계약중지속"
+        | "계약만료"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -494,6 +598,26 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["master", "admin", "viewer"],
+      blog_grade: [
+        "최적화3",
+        "최적화2",
+        "최적화1",
+        "준최적6",
+        "준최적5",
+        "준최적4",
+        "준최적3",
+        "준최적2",
+        "준최적1",
+        "일반",
+        "저품질",
+      ],
+      blogger_status: [
+        "협의중",
+        "회신대기",
+        "계약중",
+        "계약중지속",
+        "계약만료",
+      ],
     },
   },
 } as const
