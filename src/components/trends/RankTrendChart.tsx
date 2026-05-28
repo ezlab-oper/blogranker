@@ -28,12 +28,13 @@ import { TrendChartTooltip } from './TrendChartTooltip';
 import { TrendStatsCard } from './TrendStatsCard';
 import type { CrawlResult } from '@/types/database';
 
+// 차트 라인·키워드 칩 공용 색상 (CSS 변수 미정의로 hsl(var(--chart-N))가 동작 안 함 → 명시 hex)
 const COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+  '#3b82f6', // blue
+  '#10b981', // emerald
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // violet
 ];
 
 const DATE_RANGES = [
@@ -318,21 +319,26 @@ export function RankTrendChart() {
                   selectedKeywords.length === 0
                     ? index < 5
                     : selectedKeywords.includes(kwId);
+                const colorIdx =
+                  (selectedKeywords.length === 0
+                    ? index
+                    : selectedKeywords.indexOf(kwId)) % COLORS.length;
+                const color = COLORS[colorIdx];
                 return (
                   <Badge
                     key={kwId}
                     variant={isSelected ? 'default' : 'outline'}
-                    className="cursor-pointer transition-colors hover:opacity-80"
+                    className="cursor-pointer transition-colors hover:opacity-80 border-2"
                     onClick={() => handleKeywordToggle(kwId)}
-                    style={{
-                      backgroundColor: isSelected
-                        ? COLORS[
-                            (selectedKeywords.length === 0
-                              ? index
-                              : selectedKeywords.indexOf(kwId)) % COLORS.length
-                          ]
-                        : undefined,
-                    }}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: color,
+                            color: '#fff',
+                            borderColor: color,
+                          }
+                        : undefined
+                    }
                   >
                     {getKeywordName(kwId)}
                   </Badge>
