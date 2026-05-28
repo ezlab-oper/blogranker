@@ -16,6 +16,9 @@ import {
   Map,
   BarChart3,
   Users,
+  BookOpen,
+  PenSquare,
+  UsersRound,
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,6 +43,18 @@ const allNavItems: NavItem[] = [
   { icon: FileText, label: '키워드 수집', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
+  {
+    icon: BookOpen,
+    label: '블로그 포스팅',
+    path: '/blog-posting',
+    requireFeatures: false,
+    requireSettings: false,
+    requireAdminManagement: false,
+    children: [
+      { icon: PenSquare, label: '포스팅 목록', path: '/blog-posting/postings' },
+      { icon: UsersRound, label: '블로거 목록', path: '/blog-posting/bloggers' },
+    ],
+  },
   {
     icon: Settings,
     label: '설정',
