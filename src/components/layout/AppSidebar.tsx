@@ -93,7 +93,7 @@ export function AppSidebar() {
       initial={false}
       animate={{ width: collapsed ? 80 : 260 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="h-screen bg-sidebar border-r border-sidebar-border flex flex-col"
+      className="h-screen sticky top-0 bg-sidebar border-r border-sidebar-border flex flex-col"
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
