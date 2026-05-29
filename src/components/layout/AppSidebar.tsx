@@ -42,7 +42,6 @@ const allNavItems: NavItem[] = [
   { icon: Tags, label: '키워드 관리', path: '/keywords', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: FileText, label: '키워드 수집', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
   { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
-  { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   {
     icon: BookOpen,
     label: '블로그 포스팅',
@@ -55,6 +54,7 @@ const allNavItems: NavItem[] = [
       { icon: UsersRound, label: '블로거 목록', path: '/blog-posting/bloggers' },
     ],
   },
+  { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   {
     icon: Settings,
     label: '설정',
