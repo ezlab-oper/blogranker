@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { TrendingUp } from 'lucide-react';
 import {
   LineChart,
@@ -22,25 +22,30 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
+import { useBloggers } from '@/hooks/useBloggers';
+import { useBlogUrls, OFFICIAL_BLOG_ID, extractBlogId } from '@/hooks/useBlogUrls';
 import { format, subDays, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { TrendChartTooltip } from './TrendChartTooltip';
+import { TrendChartTooltip, type RankPoint } from './TrendChartTooltip';
 import { TrendStatsCard } from './TrendStatsCard';
 import type { CrawlResult } from '@/types/database';
 
-// 차트 라인·키워드 칩 공용 색상 (CSS 변수 미정의로 hsl(var(--chart-N))가 동작 안 함 → 명시 hex)
+// 차트 라인·키워드 칩 공용 색상
 const COLORS = [
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#8b5cf6', // violet
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
 ];
 
 const DATE_RANGES = [
   { value: '7', label: '최근 7일' },
   { value: '14', label: '최근 14일' },
   { value: '30', label: '최근 30일' },
+];
+
+type Scope = 'all' | 'official' | 'partner';
+const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
+  { value: 'all', label: '전체 (공식+협업)' },
+  { value: 'official', label: '공식블로그만' },
+  { value: 'partner', label: '협업만' },
 ];
 
 interface ChartDataPoint {
@@ -51,148 +56,198 @@ interface ChartDataPoint {
 
 export function RankTrendChart() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
-  const [selectedEngineTab, setSelectedEngineTab] = useState<string>('all');
-  const [dateRange, setDateRange] = useState('7');
+  const [selectedEngineTab, setSelectedEngineTab] = useState<string>('');
+  const [dateRange, setDateRange] = useState('14');
+  const [scope, setScope] = useState<Scope>('all');
   const [hoveredDate, setHoveredDate] = useState<string>('');
 
-  const dateFrom = useMemo(() => {
-    return subDays(new Date(), parseInt(dateRange)).toISOString();
-  }, [dateRange]);
+  const cutoffIso = useMemo(
+    () => subDays(new Date(), parseInt(dateRange)).toISOString(),
+    [dateRange]
+  );
 
-  const { data: results, isLoading } = useCrawlResults({
-    latestOnly: false,
-  });
+  const { data: results, isLoading } = useCrawlResults({ latestOnly: false });
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
+  const { data: bloggers = [] } = useBloggers();
+  const { data: blogUrls = [] } = useBlogUrls();
 
-  // Create a map for quick lookup of result details
-  const resultDetailsMap = useMemo(() => {
-    if (!results) return new Map<string, CrawlResult>();
-    
-    const map = new Map<string, CrawlResult>();
-    results.forEach((r) => {
+  // 우리 측 blog_id 집합: 공식블로그 + 협업 블로거 + 시트 동기화 blog_urls
+  const ourBlogIds = useMemo(() => {
+    const s = new Set<string>();
+    s.add(OFFICIAL_BLOG_ID);
+    bloggers.forEach((b) => b.blog_id && s.add(b.blog_id));
+    blogUrls.forEach((u) => u.blog_id && s.add(u.blog_id));
+    return s;
+  }, [bloggers, blogUrls]);
+
+  // 결과 1건이 "우리 측"이고 스코프에 부합하는지
+  const isInScope = useCallback(
+    (r: CrawlResult): boolean => {
+      const bid = extractBlogId(r.blog_url);
+      if (!bid) return false;
+      if (scope === 'official') return bid === OFFICIAL_BLOG_ID;
+      if (scope === 'partner') return ourBlogIds.has(bid) && bid !== OFFICIAL_BLOG_ID;
+      return ourBlogIds.has(bid);
+    },
+    [ourBlogIds, scope]
+  );
+
+  // 엔진 정렬: 네이버 → 구글 → 그 외
+  const orderedEngines = useMemo(() => {
+    if (!engines) return [];
+    const naver = engines.find((e) => e.name === '네이버');
+    const google = engines.find((e) => e.name === '구글');
+    const others = engines.filter((e) => e.name !== '네이버' && e.name !== '구글');
+    return [naver, google, ...others].filter((e): e is NonNullable<typeof e> => !!e);
+  }, [engines]);
+
+  // 엔진 로드되면 첫 번째(네이버)로 초기 선택
+  useEffect(() => {
+    if (!selectedEngineTab && orderedEngines.length > 0) {
+      setSelectedEngineTab(orderedEngines[0].id);
+    }
+  }, [orderedEngines, selectedEngineTab]);
+
+  // 우리 측 + 기간 + 엔진 필터 ('전체' 탭 제거됨 → 항상 단일 엔진 필터)
+  const ourResults = useMemo(() => {
+    if (!results || !selectedEngineTab) return [];
+    return results.filter((r) => {
+      if (r.crawled_at < cutoffIso) return false;
+      if (r.search_engine_id !== selectedEngineTab) return false;
+      return isInScope(r);
+    });
+  }, [results, cutoffIso, selectedEngineTab, isInScope]);
+
+  // 블로거 lookup map (blog_id → Blogger, 닉네임 표시용)
+  const bloggerByBlogId = useMemo(() => {
+    const m = new Map<string, typeof bloggers[number]>();
+    bloggers.forEach((b) => {
+      if (b.blog_id) m.set(b.blog_id, b);
+    });
+    return m;
+  }, [bloggers]);
+
+  // 키워드별 (날짜 → 최저순위) 맵 — 7일 추이용
+  const recentRanksByKeyword = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    ourResults.forEach((r) => {
       const date = format(parseISO(r.crawled_at), 'yyyy-MM-dd');
-      const key = `${r.keyword_id}-${date}`;
-      // Keep the best rank for each keyword per day
-      const existing = map.get(key);
-      if (!existing || r.rank < existing.rank) {
-        map.set(key, r);
-      }
+      if (!map.has(r.keyword_id)) map.set(r.keyword_id, new Map());
+      const m = map.get(r.keyword_id)!;
+      const prev = m.get(date);
+      if (prev === undefined || r.rank < prev) m.set(date, r.rank);
     });
     return map;
-  }, [results]);
+  }, [ourResults]);
 
-  const getResultDetails = useCallback((keywordId: string, date: string): CrawlResult | undefined => {
-    return resultDetailsMap.get(`${keywordId}-${date}`);
-  }, [resultDetailsMap]);
+  // currentDate 기준으로 N일 전~당일 추이 (데이터 있는 날만)
+  const getRankTrajectory = useCallback(
+    (kwId: string, endDate: string, days: number): RankPoint[] => {
+      const m = recentRanksByKeyword.get(kwId);
+      if (!m || !endDate) return [];
+      const end = parseISO(endDate);
+      const startMs = end.getTime() - (days - 1) * 24 * 60 * 60 * 1000;
+      const points: RankPoint[] = [];
+      for (const [date, rank] of m.entries()) {
+        const ts = parseISO(date).getTime();
+        if (ts >= startMs && ts <= end.getTime()) points.push({ date, rank });
+      }
+      return points.sort((a, b) => a.date.localeCompare(b.date));
+    },
+    [recentRanksByKeyword]
+  );
 
-  // Process data for chart
+  // 키워드 × 날짜 → 우리 측의 최저(최고) 순위 + 디테일
+  const resultDetailsMap = useMemo(() => {
+    const map = new Map<string, CrawlResult>();
+    ourResults.forEach((r) => {
+      const date = format(parseISO(r.crawled_at), 'yyyy-MM-dd');
+      const key = `${r.keyword_id}-${date}`;
+      const existing = map.get(key);
+      if (!existing || r.rank < existing.rank) map.set(key, r);
+    });
+    return map;
+  }, [ourResults]);
+
+  const getResultDetails = useCallback(
+    (keywordId: string, date: string): CrawlResult | undefined =>
+      resultDetailsMap.get(`${keywordId}-${date}`),
+    [resultDetailsMap]
+  );
+
+  // 우리 결과가 한 번이라도 등장한 키워드만 표시 대상
+  const displayKeywordIds = useMemo(() => {
+    const ids = new Set<string>();
+    ourResults.forEach((r) => ids.add(r.keyword_id));
+    return Array.from(ids);
+  }, [ourResults]);
+
+  // 활성 키워드(선택값 우선, 미선택 시 자동 5개)
+  const activeKeywords = useMemo(
+    () => (selectedKeywords.length === 0 ? displayKeywordIds.slice(0, 5) : selectedKeywords),
+    [selectedKeywords, displayKeywordIds]
+  );
+
+  const getKeywordName = useCallback(
+    (id: string) => keywords?.find((k) => k.id === id)?.keyword || id,
+    [keywords]
+  );
+
+  // 차트 데이터
   const { chartData, keywordStats } = useMemo(() => {
-    if (!results || results.length === 0) {
-      return { chartData: [], keywordStats: {} };
+    if (ourResults.length === 0) {
+      return { chartData: [], keywordStats: {} as Record<string, { first: number; last: number; change: number }> };
     }
 
-    // Get unique keywords from results
-    const keywordMap = new Map<string, string>();
-    results.forEach((r) => {
-      if (r.keyword) {
-        keywordMap.set(r.keyword_id, r.keyword.keyword);
-      }
+    // 날짜별 키워드별 최저 rank
+    const dateKwRank = new Map<string, Map<string, number>>();
+    ourResults.forEach((r) => {
+      if (!activeKeywords.includes(r.keyword_id)) return;
+      const date = format(parseISO(r.crawled_at), 'yyyy-MM-dd');
+      if (!dateKwRank.has(date)) dateKwRank.set(date, new Map());
+      const m = dateKwRank.get(date)!;
+      const prev = m.get(r.keyword_id);
+      if (prev === undefined || r.rank < prev) m.set(r.keyword_id, r.rank);
     });
 
-    // Auto-select first 5 keywords if none selected
-    const displayKeywords =
-      selectedKeywords.length > 0
-        ? selectedKeywords
-        : Array.from(keywordMap.keys()).slice(0, 5);
-
-    // Group by date and keyword
-    const dateKeywordMap = new Map<string, Map<string, number[]>>();
-
-    results
-      .filter((r) => displayKeywords.includes(r.keyword_id))
-      .forEach((r) => {
-        const date = format(parseISO(r.crawled_at), 'yyyy-MM-dd');
-        if (!dateKeywordMap.has(date)) {
-          dateKeywordMap.set(date, new Map());
-        }
-        const keywordRanks = dateKeywordMap.get(date)!;
-        if (!keywordRanks.has(r.keyword_id)) {
-          keywordRanks.set(r.keyword_id, []);
-        }
-        keywordRanks.get(r.keyword_id)!.push(r.rank);
-      });
-
-    // Calculate average rank per day per keyword
-    const chartData: ChartDataPoint[] = [];
-    const sortedDates = Array.from(dateKeywordMap.keys()).sort();
-
-    sortedDates.forEach((date) => {
+    const sortedDates = Array.from(dateKwRank.keys()).sort();
+    const data: ChartDataPoint[] = sortedDates.map((date) => {
       const point: ChartDataPoint = {
         date,
         dateLabel: format(parseISO(date), 'MM/dd', { locale: ko }),
       };
-
-      const keywordRanks = dateKeywordMap.get(date)!;
-      displayKeywords.forEach((kwId) => {
-        const ranks = keywordRanks.get(kwId);
-        if (ranks && ranks.length > 0) {
-          const avg = ranks.reduce((a, b) => a + b, 0) / ranks.length;
-          point[kwId] = Math.round(avg * 10) / 10;
-        }
+      const m = dateKwRank.get(date)!;
+      activeKeywords.forEach((kwId) => {
+        const v = m.get(kwId);
+        if (v !== undefined) point[kwId] = v;
       });
-
-      chartData.push(point);
+      return point;
     });
 
-    // Calculate stats for each keyword
-    const keywordStats: Record<string, { first: number; last: number; change: number }> = {};
-    displayKeywords.forEach((kwId) => {
-      const values = chartData
+    // 키워드별 통계: 첫/마지막 등장 + 변화량
+    const stats: Record<string, { first: number; last: number; change: number }> = {};
+    activeKeywords.forEach((kwId) => {
+      const values = data
         .map((d) => d[kwId] as number | undefined)
         .filter((v): v is number => v !== undefined);
-      
-      if (values.length >= 2) {
+      if (values.length >= 1) {
         const first = values[0];
         const last = values[values.length - 1];
-        keywordStats[kwId] = {
-          first,
-          last,
-          change: first - last, // Positive = improved (lower rank is better)
-        };
+        stats[kwId] = { first, last, change: first - last }; // 양수 = 개선
       }
     });
 
-    return { chartData, keywordStats };
-  }, [results, selectedKeywords]);
+    return { chartData: data, keywordStats: stats };
+  }, [ourResults, activeKeywords]);
 
-  // Get displayable keywords
-  const displayKeywordIds = useMemo(() => {
-    if (!results) return [];
-    const ids = new Set<string>();
-    results.forEach((r) => ids.add(r.keyword_id));
-    return Array.from(ids);
-  }, [results]);
-
-  const getKeywordName = useCallback((id: string) => {
-    return keywords?.find((k) => k.id === id)?.keyword || id;
-  }, [keywords]);
-
-  const handleKeywordToggle = (keywordId: string) => {
+  const handleKeywordToggle = (kwId: string) => {
     setSelectedKeywords((prev) => {
-      if (prev.includes(keywordId)) {
-        return prev.filter((id) => id !== keywordId);
-      }
-      if (prev.length >= 5) {
-        return prev; // Max 5 keywords
-      }
-      return [...prev, keywordId];
+      if (prev.includes(kwId)) return prev.filter((id) => id !== kwId);
+      if (prev.length >= 5) return prev;
+      return [...prev, kwId];
     });
   };
-
-  const activeKeywords = selectedKeywords.length === 0
-    ? displayKeywordIds.slice(0, 5)
-    : selectedKeywords;
 
   if (isLoading) {
     return (
@@ -206,21 +261,23 @@ export function RankTrendChart() {
     );
   }
 
-  if (!results || results.length === 0) {
+  // 빈 상태
+  if (!results || results.length === 0 || displayKeywordIds.length === 0) {
     return (
       <Card className="shadow-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            순위 변동 차트
+            협업·공식블로그 순위 추이
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <TrendingUp className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-lg font-medium">데이터 수집 후 표시됩니다</p>
-            <p className="text-sm mt-1">
-              키워드를 등록하고 수집을 시작하면 순위 변동 추이를 확인할 수 있습니다.
+            <p className="text-lg font-medium">기간 내 우리 측 순위 진입 데이터가 없습니다</p>
+            <p className="text-sm mt-1 text-center">
+              "블로거 목록"에 협업 블로거를 등록하거나, "키워드 수집"을 실행해보세요.<br />
+              스코프를 "공식블로그만/협업만"으로 좁히면 결과가 더 적을 수 있습니다.
             </p>
           </div>
         </CardContent>
@@ -231,7 +288,7 @@ export function RankTrendChart() {
   const renderChart = () => (
     <div className="h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart 
+        <LineChart
           data={chartData}
           onMouseMove={(e) => {
             if (e?.activePayload?.[0]?.payload?.date) {
@@ -240,17 +297,14 @@ export function RankTrendChart() {
           }}
         >
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis
-            dataKey="dateLabel"
-            tick={{ fontSize: 12 }}
-            className="text-muted-foreground"
-          />
+          <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} className="text-muted-foreground" />
           <YAxis
             reversed
-            domain={[1, 'auto']}
+            domain={[1, 10]}
+            allowDecimals={false}
             tick={{ fontSize: 12 }}
             label={{
-              value: '순위',
+              value: '순위(낮을수록 상위)',
               angle: -90,
               position: 'insideLeft',
               style: { textAnchor: 'middle', fontSize: 12 },
@@ -262,14 +316,13 @@ export function RankTrendChart() {
               <TrendChartTooltip
                 getKeywordName={getKeywordName}
                 getResultDetails={getResultDetails}
+                getRankTrajectory={getRankTrajectory}
+                bloggerByBlogId={bloggerByBlogId}
                 currentDate={hoveredDate}
               />
             }
           />
-          <Legend
-            formatter={(value) => getKeywordName(value)}
-            wrapperStyle={{ paddingTop: '20px' }}
-          />
+          <Legend formatter={(value) => getKeywordName(value)} wrapperStyle={{ paddingTop: '20px' }} />
           {activeKeywords.map((kwId, index) => (
             <Line
               key={kwId}
@@ -280,7 +333,7 @@ export function RankTrendChart() {
               strokeWidth={2}
               dot={{ r: 4 }}
               activeDot={{ r: 6, strokeWidth: 2 }}
-              connectNulls
+              connectNulls={false}
             />
           ))}
         </LineChart>
@@ -293,36 +346,39 @@ export function RankTrendChart() {
       {/* Filters */}
       <Card className="shadow-card">
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-popover">
-                {DATE_RANGES.map((range) => (
-                  <SelectItem key={range.value} value={range.value}>
-                    {range.label}
-                  </SelectItem>
+                {DATE_RANGES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Select value={scope} onValueChange={(v) => setScope(v as Scope)}>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-popover">
+                {SCOPE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">
+              우리 측 = 공식블로그(ezlab_official) + 협업 블로거 + 시트 동기화 URL
+            </span>
           </div>
 
           {/* Keyword Selection */}
           <div>
             <p className="text-sm text-muted-foreground mb-2">
-              키워드 선택 (최대 5개)
+              키워드 선택 (최대 5개) — 우리 측 글이 등장한 키워드만 표시
             </p>
             <div className="flex flex-wrap gap-2">
               {displayKeywordIds.map((kwId, index) => {
                 const isSelected =
-                  selectedKeywords.length === 0
-                    ? index < 5
-                    : selectedKeywords.includes(kwId);
+                  selectedKeywords.length === 0 ? index < 5 : selectedKeywords.includes(kwId);
                 const colorIdx =
-                  (selectedKeywords.length === 0
-                    ? index
-                    : selectedKeywords.indexOf(kwId)) % COLORS.length;
+                  (selectedKeywords.length === 0 ? index : selectedKeywords.indexOf(kwId)) % COLORS.length;
                 const color = COLORS[colorIdx];
                 return (
                   <Badge
@@ -330,15 +386,7 @@ export function RankTrendChart() {
                     variant={isSelected ? 'default' : 'outline'}
                     className="cursor-pointer transition-colors hover:opacity-80 border-2"
                     onClick={() => handleKeywordToggle(kwId)}
-                    style={
-                      isSelected
-                        ? {
-                            backgroundColor: color,
-                            color: '#fff',
-                            borderColor: color,
-                          }
-                        : undefined
-                    }
+                    style={isSelected ? { backgroundColor: color, color: '#fff', borderColor: color } : undefined}
                   >
                     {getKeywordName(kwId)}
                   </Badge>
@@ -354,25 +402,20 @@ export function RankTrendChart() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            순위 변동 차트
+            협업·공식블로그 순위 추이
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs value={selectedEngineTab} onValueChange={setSelectedEngineTab}>
             <TabsList className="mb-4">
-              <TabsTrigger value="all">전체</TabsTrigger>
-              {engines?.map((engine) => (
+              {orderedEngines.map((engine) => (
                 <TabsTrigger key={engine.id} value={engine.id}>
                   {engine.name}
                 </TabsTrigger>
               ))}
             </TabsList>
-            
-            <TabsContent value="all" className="mt-0">
-              {renderChart()}
-            </TabsContent>
-            
-            {engines?.map((engine) => (
+
+            {orderedEngines.map((engine) => (
               <TabsContent key={engine.id} value={engine.id} className="mt-0">
                 {renderChart()}
               </TabsContent>
@@ -387,7 +430,6 @@ export function RankTrendChart() {
           {activeKeywords.map((kwId, index) => {
             const stats = keywordStats[kwId];
             if (!stats) return null;
-
             return (
               <TrendStatsCard
                 key={kwId}
