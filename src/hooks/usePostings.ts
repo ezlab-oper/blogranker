@@ -9,6 +9,8 @@ export interface Posting {
   posting_url: string;
   blog_id: string | null;
   title: string | null;
+  program: string | null;
+  target_keywords: string[] | null;
   created_at: string;
   updated_at: string;
   blogger?: Blogger | null; // join
@@ -19,6 +21,8 @@ export interface PostingInput {
   blogger_id?: string | null;
   title?: string | null;
   blog_id?: string | null;
+  program?: string | null;
+  target_keywords?: string[] | null;
 }
 
 export function usePostings() {
