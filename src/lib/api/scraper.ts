@@ -77,6 +77,24 @@ export async function runCrawlJob(
   error?: string;
   cancelled?: boolean;
 }> {
+  // 동시 실행 방지: 60분 이내 시작된 running 작업이 있으면 거부
+  const sixtyMinAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { data: existingRunning } = await supabase
+    .from('crawl_jobs')
+    .select('id, started_at, total_keywords, processed_keywords')
+    .eq('status', 'running')
+    .gte('started_at', sixtyMinAgoIso)
+    .limit(1);
+  if (existingRunning && existingRunning.length > 0) {
+    const e = existingRunning[0];
+    const total = Math.max(1, e.total_keywords || 1);
+    const pct = Math.round(((e.processed_keywords || 0) / total) * 100);
+    return {
+      success: false,
+      error: `이미 수집 작업이 진행 중입니다. (${e.processed_keywords || 0}/${e.total_keywords || '?'} · ${pct}%) 완료될 때까지 기다려 주세요.`,
+    };
+  }
+
   // Create new abort controller for this job
   currentAbortController = new AbortController();
   const signal = currentAbortController.signal;

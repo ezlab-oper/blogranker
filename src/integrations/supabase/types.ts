@@ -448,6 +448,7 @@ export type Database = {
       schedule_cron_job: {
         Args: {
           auth_token: string
+          cron_secret?: string
           function_url: string
           job_name: string
           schedule: string

@@ -8,3 +8,8 @@ verify_jwt = false
 
 [functions.sync-blog-urls]
 verify_jwt = false
+
+# pg_cron에서 호출 (신형 키 sb_secret_*은 verify_jwt 통과 못함 → off).
+# 함수 본문에서 별도 secret 검증으로 무단 호출 차단 가능.
+[functions.scheduled-crawl]
+verify_jwt = false

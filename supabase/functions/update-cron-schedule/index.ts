@@ -72,7 +72,9 @@ Deno.serve(async (req) => {
           job_name: jobName,
           schedule: cronExpression,
           function_url: `${supabaseUrl}/functions/v1/scheduled-crawl`,
-          auth_token: anonKey,
+          auth_token: supabaseServiceKey,
+          // scheduled-crawl이 X-Cron-Secret 헤더로 무단 호출 차단
+          cron_secret: Deno.env.get('CRON_SECRET') || '',
         }),
       });
 

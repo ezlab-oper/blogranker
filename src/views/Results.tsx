@@ -7,6 +7,7 @@ import { ResultsTable } from '@/components/results/ResultsTable';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useKeywords } from '@/hooks/useKeywords';
+import { useRunningCrawlJob } from '@/hooks/useCrawlResults';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { runCrawlJob, cancelCrawlJob, CrawlProgress } from '@/lib/api/scraper';
@@ -21,6 +22,9 @@ export default function Results() {
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
   const syncBlogUrls = useSyncBlogUrls();
+  const { data: runningJob } = useRunningCrawlJob();
+  // 내 클릭이 아니면서 다른 작업이 진행 중인 경우
+  const blockedByOther = !!runningJob && !isCrawling;
 
   // Lifted filter state shared with ResultsTable
   const [selectedProgram, setSelectedProgram] = useState('');
@@ -47,6 +51,22 @@ export default function Results() {
     : `전체 (${crawlTargets.length}개)`;
 
   const handleStartCrawl = async () => {
+    // 동시 실행 방지: 다른 작업(스케줄·다른 탭)이 이미 진행 중이면 얼럿
+    if (blockedByOther && runningJob) {
+      const total = Math.max(1, runningJob.total_keywords || 1);
+      const pct = Math.round(((runningJob.processed_keywords || 0) / total) * 100);
+      toast({
+        title: '이미 수집 작업이 진행 중입니다',
+        description: `${runningJob.processed_keywords || 0}/${runningJob.total_keywords || '?'} (${pct}%) 완료될 때까지 기다려 주세요.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    // 내가 이미 수집 중인 경우 (방어적)
+    if (isCrawling) {
+      toast({ title: '수집 진행 중', description: '현재 수집이 끝날 때까지 기다려 주세요.', variant: 'destructive' });
+      return;
+    }
     if (crawlTargets.length === 0) {
       toast({ title: '수집 대상 없음', description: '선택한 조건에 해당하는 활성 키워드가 없습니다.', variant: 'destructive' });
       return;
@@ -120,13 +140,22 @@ export default function Results() {
             <Button
               className="gradient-primary text-white gap-2"
               onClick={handleStartCrawl}
-              disabled={isCrawling || !canPerformActions}
-              title={`수집 대상: ${crawlLabel}`}
+              disabled={isCrawling || !canPerformActions || blockedByOther}
+              title={
+                blockedByOther
+                  ? `다른 수집 작업 진행 중 (${runningJob?.processed_keywords ?? 0}/${runningJob?.total_keywords ?? '?'})`
+                  : `수집 대상: ${crawlLabel}`
+              }
             >
               {isCrawling ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   수집 중...
+                </>
+              ) : blockedByOther ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  다른 작업 진행 중 ({runningJob?.processed_keywords ?? 0}/{runningJob?.total_keywords ?? '?'})
                 </>
               ) : (
                 <>

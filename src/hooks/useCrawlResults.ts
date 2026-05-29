@@ -77,6 +77,25 @@ export function useCrawlResults(filters?: {
   });
 }
 
+// 진행 중인 crawl_job (60분 이내 시작한 running) — 동시 실행 방지용. 5초 폴링.
+export function useRunningCrawlJob() {
+  return useQuery({
+    queryKey: ['running_crawl_job'],
+    queryFn: async () => {
+      const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('crawl_jobs')
+        .select('id, started_at, total_keywords, processed_keywords')
+        .eq('status', 'running')
+        .gte('started_at', sixtyMinAgo)
+        .order('started_at', { ascending: false })
+        .limit(1);
+      return data?.[0] ?? null;
+    },
+    refetchInterval: 5000,
+  });
+}
+
 export function useDashboardStats() {
   return useQuery({
     queryKey: ['dashboard_stats'],

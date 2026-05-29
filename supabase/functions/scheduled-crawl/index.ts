@@ -66,12 +66,53 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // ===== 1) X-Cron-Secret 검증 (무단 호출 차단) =====
+  const expectedSecret = Deno.env.get('CRON_SECRET');
+  const providedSecret = req.headers.get('x-cron-secret') || '';
+  if (!expectedSecret) {
+    console.error('CRON_SECRET 미설정 — 함수 거부');
+    return new Response(
+      JSON.stringify({ success: false, error: 'Server misconfiguration' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  if (providedSecret !== expectedSecret) {
+    console.warn('잘못된 X-Cron-Secret 헤더 — 거부');
+    return new Response(
+      JSON.stringify({ success: false, error: 'Forbidden' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     console.log('Scheduled crawl triggered at:', new Date().toISOString());
+
+    // ===== 2) 동시 실행 방지: 이미 진행 중인 crawl_jobs가 있으면 skip =====
+    // 60분 이내 시작된 'running' 작업만 살아있다고 판단 (그 이상은 stale로 간주)
+    const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { data: runningJobs } = await supabase
+      .from('crawl_jobs')
+      .select('id, started_at, processed_keywords, total_keywords')
+      .eq('status', 'running')
+      .gte('started_at', sixtyMinAgo)
+      .limit(1);
+    if (runningJobs && runningJobs.length > 0) {
+      const j = runningJobs[0];
+      console.log(`이미 다른 수집 작업 진행 중 → skip (job ${j.id}, ${j.processed_keywords}/${j.total_keywords})`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: 'Another crawl job already running',
+          existing_job_id: j.id,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get schedule settings
     const { data: scheduleData } = await supabase
