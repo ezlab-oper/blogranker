@@ -96,8 +96,8 @@ export function BloggerCsvUpload() {
           email: iEmail >= 0 ? (row[iEmail] || '').trim() || null : null,
           unit_price: priceRaw ? parseInt(priceRaw, 10) : null,
           status: (statusVal as BloggerStatus) || null,
-          contract_end_date: dateVal || null,
-          blog_grade: (gradeVal as BlogGrade) || null,
+          contract_end_date: dateVal || '2999-12-31', // 미선택 시 '계속'
+          blog_grade: (gradeVal as BlogGrade) || '일반', // 미선택 시 '일반'
           is_influencer: infVal === '유',
           memo: iMemo >= 0 ? (row[iMemo] || '').trim() || null : null,
         });

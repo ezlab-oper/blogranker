@@ -39,9 +39,12 @@ const empty: BloggerInput = {
   memo: '',
 };
 
+const CONTINUOUS_DATE = '2999-12-31'; // '계속' 센티넬
+
 export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending }: Props) {
   const [form, setForm] = useState<BloggerInput>(empty);
   const [memoOpen, setMemoOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -74,7 +77,15 @@ export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending
     setForm((p) => ({ ...p, unit_price: digits === '' ? null : parseInt(digits, 10) }));
   };
 
-  const contractDate = form.contract_end_date ? new Date(form.contract_end_date) : undefined;
+  // 계약 만료일 표시: '계속' 센티넬이면 Calendar에 selected=undefined, 라벨은 '계속'
+  const isContinuous = form.contract_end_date === CONTINUOUS_DATE;
+  const contractDate =
+    form.contract_end_date && !isContinuous ? new Date(form.contract_end_date) : undefined;
+  const contractDateLabel = isContinuous
+    ? '계속'
+    : contractDate
+    ? format(contractDate, 'yyyy-MM-dd', { locale: ko })
+    : '';
 
   const canSubmit = form.name.trim() !== '' && form.blog_url.trim() !== '';
 
@@ -84,6 +95,10 @@ export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending
       ...form,
       email: form.email?.trim() || null,
       memo: form.memo?.trim() || null,
+      // 미선택 시 '계속'(2999-12-31)으로 자동 설정
+      contract_end_date: form.contract_end_date || CONTINUOUS_DATE,
+      // 미선택 시 '일반'으로 자동 설정
+      blog_grade: form.blog_grade || '일반',
     });
   };
 
@@ -143,20 +158,37 @@ export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>계약 만료일</Label>
-                <Popover>
+                <Label>계약 만료일(미선택 시 계속)</Label>
+                <Popover open={calOpen} onOpenChange={setCalOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline"
-                      className={cn('w-full justify-start font-normal', !contractDate && 'text-muted-foreground')}>
+                      className={cn('w-full justify-start font-normal', !contractDateLabel && 'text-muted-foreground')}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {contractDate ? format(contractDate, 'yyyy-MM-dd', { locale: ko }) : '날짜 선택'}
+                      {contractDateLabel || '날짜 선택'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                  <PopoverContent className="w-auto p-0 bg-popover" align="start" side="top" sideOffset={4}>
+                    <div className="flex items-center gap-2 p-2 border-b">
+                      <Button size="sm" variant="ghost" className="flex-1"
+                        onClick={() => {
+                          setForm((p) => ({ ...p, contract_end_date: format(new Date(), 'yyyy-MM-dd') }));
+                          setCalOpen(false);
+                        }}>
+                        오늘 날짜
+                      </Button>
+                      <Button size="sm" variant="ghost" className="flex-1 text-muted-foreground"
+                        onClick={() => {
+                          setForm((p) => ({ ...p, contract_end_date: null }));
+                          setCalOpen(false);
+                        }}>
+                        계속(미선택)
+                      </Button>
+                    </div>
                     <Calendar mode="single" selected={contractDate}
-                      onSelect={(d) =>
-                        setForm((p) => ({ ...p, contract_end_date: d ? format(d, 'yyyy-MM-dd') : null }))
-                      }
+                      onSelect={(d) => {
+                        setForm((p) => ({ ...p, contract_end_date: d ? format(d, 'yyyy-MM-dd') : null }));
+                        setCalOpen(false);
+                      }}
                       initialFocus />
                   </PopoverContent>
                 </Popover>

@@ -273,6 +273,8 @@ export type Database = {
           created_at: string
           id: string
           posting_url: string
+          program: string | null
+          target_keywords: string[] | null
           title: string | null
           updated_at: string
         }
@@ -282,6 +284,8 @@ export type Database = {
           created_at?: string
           id?: string
           posting_url: string
+          program?: string | null
+          target_keywords?: string[] | null
           title?: string | null
           updated_at?: string
         }
@@ -291,6 +295,8 @@ export type Database = {
           created_at?: string
           id?: string
           posting_url?: string
+          program?: string | null
+          target_keywords?: string[] | null
           title?: string | null
           updated_at?: string
         }
@@ -464,12 +470,7 @@ export type Database = {
         | "준최적1"
         | "일반"
         | "저품질"
-      blogger_status:
-        | "협의중"
-        | "회신대기"
-        | "계약중"
-        | "계약중지속"
-        | "계약만료"
+      blogger_status: "협의중" | "회신대기" | "계약중" | "계약만료"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -611,13 +612,7 @@ export const Constants = {
         "일반",
         "저품질",
       ],
-      blogger_status: [
-        "협의중",
-        "회신대기",
-        "계약중",
-        "계약중지속",
-        "계약만료",
-      ],
+      blogger_status: ["협의중", "회신대기", "계약중", "계약만료"],
     },
   },
 } as const

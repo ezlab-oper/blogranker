@@ -2,14 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { extractBlogId } from '@/hooks/useBlogUrls';
 
-export type BloggerStatus = '협의중' | '회신대기' | '계약중' | '계약중지속' | '계약만료';
+export type BloggerStatus = '협의중' | '회신대기' | '계약중' | '계약만료';
 export type BlogGrade =
   | '최적화3' | '최적화2' | '최적화1'
   | '준최적6' | '준최적5' | '준최적4' | '준최적3' | '준최적2' | '준최적1'
   | '일반' | '저품질';
 
 export const BLOGGER_STATUS_OPTIONS: BloggerStatus[] = [
-  '협의중', '회신대기', '계약중', '계약중지속', '계약만료',
+  '협의중', '회신대기', '계약중', '계약만료',
 ];
 
 export const BLOG_GRADE_OPTIONS: BlogGrade[] = [

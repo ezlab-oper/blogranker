@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,7 +14,8 @@ import { UserPlus, Edit, Trash2, ChevronLeft, ChevronRight, FileText, ExternalLi
 import {
   useBloggers, useAddBlogger, useUpdateBlogger, useDeleteBlogger,
   formatUnitPrice,
-  type Blogger,
+  BLOGGER_STATUS_OPTIONS,
+  type Blogger, type BloggerStatus,
 } from '@/hooks/useBloggers';
 import { BloggerDialog } from '@/components/blog-posting/BloggerDialog';
 import { BloggerCsvUpload } from '@/components/blog-posting/BloggerCsvUpload';
@@ -23,9 +26,19 @@ import { cn } from '@/lib/utils';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+// 오늘 날짜(YYYY-MM-DD)
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// 계약만료일이 지난 블로거는 상태를 '계약만료'로 본다 (저장값과 무관하게 화면용)
+function effectiveStatus(b: Blogger): BloggerStatus | null {
+  if (b.contract_end_date && b.contract_end_date < todayStr()) return '계약만료';
+  return b.status;
+}
+
 export default function BloggersList() {
   const { canPerformActions } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: bloggers = [], isLoading } = useBloggers();
   const addBlogger = useAddBlogger();
   const updateBlogger = useUpdateBlogger();
@@ -37,11 +50,40 @@ export default function BloggersList() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [statusFilter, setStatusFilter] = useState<BloggerStatus | ''>('');
+  const [infFilter, setInfFilter] = useState<'all' | 'yes' | 'no'>('all');
 
-  const total = bloggers.length;
+  // 계약만료일이 지났는데 status가 '계약만료'가 아닌 행 → DB에 일괄 반영 (editor 권한 보유 시)
+  useEffect(() => {
+    if (!canPerformActions || bloggers.length === 0) return;
+    const today = todayStr();
+    const expired = bloggers.filter(
+      (b) => b.contract_end_date && b.contract_end_date < today && b.status !== '계약만료'
+    );
+    if (expired.length === 0) return;
+    (async () => {
+      const { error } = await supabase
+        .from('bloggers')
+        .update({ status: '계약만료' })
+        .in('id', expired.map((b) => b.id));
+      if (!error) queryClient.invalidateQueries({ queryKey: ['bloggers'] });
+    })();
+  }, [bloggers, canPerformActions, queryClient]);
+
+  // 필터 적용
+  const filtered = useMemo(() => {
+    return bloggers.filter((b) => {
+      if (statusFilter && effectiveStatus(b) !== statusFilter) return false;
+      if (infFilter === 'yes' && !b.is_influencer) return false;
+      if (infFilter === 'no' && b.is_influencer) return false;
+      return true;
+    });
+  }, [bloggers, statusFilter, infFilter]);
+
+  const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = (page - 1) * pageSize;
-  const items = useMemo(() => bloggers.slice(start, start + pageSize), [bloggers, start, pageSize]);
+  const items = useMemo(() => filtered.slice(start, start + pageSize), [filtered, start, pageSize]);
 
   const handleAddOrUpdate = async (input: Parameters<typeof addBlogger.mutateAsync>[0]) => {
     try {
@@ -90,10 +132,40 @@ export default function BloggersList() {
           )}
         </motion.div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 p-4 bg-card rounded-xl border shadow-card">
+          <Select
+            value={statusFilter || 'all'}
+            onValueChange={(v) => { setStatusFilter(v === 'all' ? '' : (v as BloggerStatus)); setPage(1); }}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="상태" /></SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="all">전체 상태</SelectItem>
+              {BLOGGER_STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select
+            value={infFilter}
+            onValueChange={(v) => { setInfFilter(v as 'all' | 'yes' | 'no'); setPage(1); }}>
+            <SelectTrigger className="w-32"><SelectValue placeholder="인플" /></SelectTrigger>
+            <SelectContent className="bg-popover">
+              <SelectItem value="all">전체 인플</SelectItem>
+              <SelectItem value="yes">유</SelectItem>
+              <SelectItem value="no">무</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline"
+            onClick={() => { setStatusFilter(''); setInfFilter('all'); setPage(1); }}>
+            초기화
+          </Button>
+        </div>
+
         {/* Toolbar */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             총 <span className="font-semibold text-foreground">{total}</span>명
+            {(statusFilter || infFilter !== 'all') && (
+              <span className="ml-2 text-xs">(필터 적용됨, 전체 {bloggers.length}명 중)</span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">페이지당</span>
@@ -116,6 +188,7 @@ export default function BloggersList() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
+                  <TableHead className="w-28">등록일</TableHead>
                   <TableHead>블로거명</TableHead>
                   <TableHead>블로그</TableHead>
                   <TableHead>이메일</TableHead>
@@ -129,8 +202,13 @@ export default function BloggersList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((b) => (
+                {items.map((b) => {
+                  const eff = effectiveStatus(b);
+                  return (
                   <TableRow key={b.id} className="group">
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(b.created_at).toLocaleDateString('ko-KR')}
+                    </TableCell>
                     <TableCell className="font-medium">{b.name}</TableCell>
                     <TableCell>
                       <a href={b.blog_url} target="_blank" rel="noopener noreferrer"
@@ -141,8 +219,19 @@ export default function BloggersList() {
                     </TableCell>
                     <TableCell className="text-sm">{b.email || '-'}</TableCell>
                     <TableCell className="text-right text-sm tabular-nums">{formatUnitPrice(b.unit_price)}</TableCell>
-                    <TableCell>{b.status ? <Badge variant="outline">{b.status}</Badge> : '-'}</TableCell>
-                    <TableCell className="text-sm">{b.contract_end_date || '-'}</TableCell>
+                    <TableCell>
+                      {eff ? (
+                        <Badge variant="outline"
+                          className={cn(eff === '계약만료' && 'text-destructive border-destructive/40')}>
+                          {eff}
+                        </Badge>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {b.contract_end_date === '2999-12-31'
+                        ? <span className="text-muted-foreground">계속</span>
+                        : (b.contract_end_date || '-')}
+                    </TableCell>
                     <TableCell>{b.blog_grade ? <Badge variant="secondary">{b.blog_grade}</Badge> : '-'}</TableCell>
                     <TableCell className="text-center">
                       <span className={cn('text-xs font-medium', b.is_influencer ? 'text-emerald-600' : 'text-muted-foreground')}>
@@ -189,7 +278,8 @@ export default function BloggersList() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
