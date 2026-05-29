@@ -26,6 +26,10 @@ next-env.d.ts
 supabase/.temp
 supabase/.branches
 
+# 운영 데이터 파일 (PII 포함 가능 — 저장소 외부 보관)
+bloggers_template.csv
+bloggers_*.csv
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
