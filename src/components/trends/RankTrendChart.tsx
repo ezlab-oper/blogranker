@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, ExternalLink, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   LineChart,
   Line,
@@ -27,7 +28,7 @@ import { useBlogUrls, OFFICIAL_BLOG_ID, extractBlogId } from '@/hooks/useBlogUrl
 import { format, subDays, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { TrendChartTooltip, type RankPoint } from './TrendChartTooltip';
-import { TrendStatsCard } from './TrendStatsCard';
+import { extractBlogId as extractBid } from '@/hooks/useBlogUrls';
 import type { CrawlResult } from '@/types/database';
 
 // 차트 라인·키워드 칩 공용 색상
@@ -60,6 +61,7 @@ export function RankTrendChart() {
   const [dateRange, setDateRange] = useState('14');
   const [scope, setScope] = useState<Scope>('all');
   const [hoveredDate, setHoveredDate] = useState<string>('');
+  const [pinnedDate, setPinnedDate] = useState<string>('');
 
   const cutoffIso = useMemo(
     () => subDays(new Date(), parseInt(dateRange)).toISOString(),
@@ -295,6 +297,10 @@ export function RankTrendChart() {
               setHoveredDate(e.activePayload[0].payload.date);
             }
           }}
+          onClick={(e: any) => {
+            const d = e?.activePayload?.[0]?.payload?.date;
+            if (d) setPinnedDate(d);
+          }}
         >
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} className="text-muted-foreground" />
@@ -424,25 +430,157 @@ export function RankTrendChart() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      {Object.keys(keywordStats).length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {activeKeywords.map((kwId, index) => {
-            const stats = keywordStats[kwId];
-            if (!stats) return null;
-            return (
-              <TrendStatsCard
-                key={kwId}
-                keywordId={kwId}
-                keywordName={getKeywordName(kwId)}
-                stats={stats}
-                color={COLORS[index % COLORS.length]}
-                index={index}
-              />
-            );
-          })}
-        </div>
+      {/* Pinned Date Detail Panel — 그래프 점 클릭 시 표시 */}
+      {pinnedDate && (
+        <PinnedRankPanel
+          date={pinnedDate}
+          activeKeywords={activeKeywords}
+          getKeywordName={getKeywordName}
+          getResultDetails={getResultDetails}
+          getRankTrajectory={getRankTrajectory}
+          bloggerByBlogId={bloggerByBlogId}
+          onClose={() => setPinnedDate('')}
+        />
       )}
     </div>
+  );
+}
+
+// ---------- 핀 고정 상세 패널 ----------
+
+interface PinnedPanelProps {
+  date: string;
+  activeKeywords: string[];
+  getKeywordName: (id: string) => string;
+  getResultDetails: (kwId: string, date: string) => CrawlResult | undefined;
+  getRankTrajectory: (kwId: string, endDate: string, days: number) => RankPoint[];
+  bloggerByBlogId: Map<string, { id: string; name: string; blog_id: string | null }>;
+  onClose: () => void;
+}
+
+function buildHomeUrl(blogId: string, blogUrl: string): string {
+  if (blogUrl.includes('blog.naver.com')) return `https://blog.naver.com/${blogId}`;
+  if (blogUrl.includes('tistory.com')) return `https://${blogId}.tistory.com`;
+  if (blogUrl.includes('velog.io')) return `https://velog.io/@${blogId}`;
+  if (blogUrl.includes('brunch.co.kr')) return `https://brunch.co.kr/@${blogId}`;
+  return blogUrl;
+}
+
+function PinnedRankPanel({
+  date,
+  activeKeywords,
+  getKeywordName,
+  getResultDetails,
+  getRankTrajectory,
+  bloggerByBlogId,
+  onClose,
+}: PinnedPanelProps) {
+  // 그날 순위 있는 키워드만 + 순위 오름차순
+  const rows = activeKeywords
+    .map((kwId) => {
+      const details = getResultDetails(kwId, date);
+      if (!details) return null;
+      return { kwId, details };
+    })
+    .filter((x): x is { kwId: string; details: CrawlResult } => !!x)
+    .sort((a, b) => a.details.rank - b.details.rank);
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            📅 {date} 상세
+            <span className="text-xs font-normal text-muted-foreground">
+              (그래프 점을 클릭해 다른 날짜로 전환)
+            </span>
+          </CardTitle>
+          <Button size="sm" variant="ghost" onClick={onClose} className="gap-1">
+            <X className="w-4 h-4" />
+            닫기
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">해당 날짜에 우리 측 진입 없음</p>
+        ) : (
+          <div className="divide-y">
+            {rows.map(({ kwId, details }, idx) => {
+              const blogId = extractBid(details.blog_url);
+              const homeUrl = blogId ? buildHomeUrl(blogId, details.blog_url) : details.blog_url;
+              const matched = blogId ? bloggerByBlogId.get(blogId) : undefined;
+              const nickname = matched?.name ?? null;
+
+              const rawTitle = details.blog_title?.trim();
+              const sanitizedTitle =
+                rawTitle && !/^https?:\/\//i.test(rawTitle) && !/^www\./i.test(rawTitle)
+                  ? rawTitle
+                  : null;
+
+              const trajectory = getRankTrajectory(kwId, date, 7);
+              const color = COLORS[idx % COLORS.length];
+
+              return (
+                <div key={kwId} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+                      <span className="font-medium text-sm truncate">{getKeywordName(kwId)}</span>
+                    </div>
+                    <span className="font-bold text-sm flex-shrink-0" style={{ color }}>
+                      {details.rank}위
+                    </span>
+                  </div>
+
+                  {/* 최근 7일 추이 */}
+                  {trajectory.length >= 1 && (
+                    <div className="mt-1.5 flex items-center flex-wrap gap-1 text-[11px] text-muted-foreground">
+                      <span className="opacity-70">최근 7일:</span>
+                      {trajectory.map((t, i) => {
+                        const isCur = t.date === date;
+                        return (
+                          <span key={t.date} className="inline-flex items-center gap-1">
+                            <span
+                              className={isCur ? 'font-semibold' : 'opacity-80'}
+                              style={isCur ? { color } : undefined}
+                              title={t.date}
+                            >
+                              {t.rank}
+                            </span>
+                            {i < trajectory.length - 1 && <span className="opacity-50">→</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      📝 {sanitizedTitle ?? <span className="italic opacity-70">(제목 없음)</span>}
+                    </p>
+                    {blogId && (
+                      <p className="text-xs">
+                        <span className="text-muted-foreground">✍️ </span>
+                        <a href={homeUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-primary hover:underline font-medium">
+                          {nickname ?? blogId}
+                        </a>
+                        {nickname && <span className="text-muted-foreground"> ({blogId})</span>}
+                      </p>
+                    )}
+                    <a href={details.blog_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                      <ExternalLink className="w-3 h-3" />
+                      포스팅 열기
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

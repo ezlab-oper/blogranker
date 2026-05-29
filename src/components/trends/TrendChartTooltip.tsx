@@ -1,4 +1,3 @@
-import { ExternalLink } from 'lucide-react';
 import type { CrawlResult } from '@/types/database';
 import type { Blogger } from '@/hooks/useBloggers';
 import { extractBlogId } from '@/hooks/useBlogUrls';
@@ -108,41 +107,37 @@ export function TrendChartTooltip({
                   </div>
                 )}
 
-                {details && (
-                  <div className="mt-1.5 space-y-1">
-                    {details.blog_title && (
-                      <p className="text-xs text-muted-foreground truncate">📝 {details.blog_title}</p>
-                    )}
-                    {/* 블로거 닉네임 또는 blog_id 링크 */}
-                    {blogId && (
-                      <p className="text-xs">
-                        <span className="text-muted-foreground">✍️ </span>
-                        <a
-                          href={blogHomeUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline font-medium"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {bloggerNickname ?? blogId}
-                        </a>
-                        {bloggerNickname && (
-                          <span className="text-muted-foreground"> ({blogId})</span>
-                        )}
+                {details && (() => {
+                  const rawTitle = details.blog_title?.trim();
+                  const sanitizedTitle =
+                    rawTitle && !/^https?:\/\//i.test(rawTitle) && !/^www\./i.test(rawTitle)
+                      ? rawTitle
+                      : null;
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      <p className="text-xs text-muted-foreground truncate">
+                        📝 {sanitizedTitle ?? <span className="italic opacity-70">(제목 없음)</span>}
                       </p>
-                    )}
-                    <a
-                      href={details.blog_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      포스팅 열기
-                    </a>
-                  </div>
-                )}
+                      {blogId && (
+                        <p className="text-xs">
+                          <span className="text-muted-foreground">✍️ </span>
+                          <a
+                            href={blogHomeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {bloggerNickname ?? blogId}
+                          </a>
+                          {bloggerNickname && (
+                            <span className="text-muted-foreground"> ({blogId})</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
