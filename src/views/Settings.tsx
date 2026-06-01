@@ -133,14 +133,17 @@ export default function Settings() {
           <CardContent className="space-y-4">
             {/* Cron Expression Display */}
             {localSettings.schedule.enabled && (
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Cron: <code className="px-1 py-0.5 bg-background rounded text-xs">{cronExpression}</code>
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  (매일 {localSettings.schedule.time} KST 실행)
-                </span>
+              <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                <Calendar className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  <p>
+                    매일 <strong className="text-foreground">{localSettings.schedule.time} KST</strong> 부터 자동 수집 시작
+                  </p>
+                  <p className="text-xs">
+                    Edge Function 시간 제한 때문에 키워드를 15개씩 청크로 나눠 30분 간격으로 처리합니다 (전체 완료까지 약 2~3시간).
+                    그 시각 이전 트리거는 자동 skip.
+                  </p>
+                </div>
               </div>
             )}
             

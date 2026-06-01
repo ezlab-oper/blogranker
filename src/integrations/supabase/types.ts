@@ -92,10 +92,12 @@ export type Database = {
       crawl_jobs: {
         Row: {
           completed_at: string | null
+          crawl_date: string | null
           created_at: string
           error_message: string | null
           failed_keywords: number
           id: string
+          processed_keyword_ids: string[]
           processed_keywords: number
           started_at: string | null
           status: string
@@ -104,10 +106,12 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          crawl_date?: string | null
           created_at?: string
           error_message?: string | null
           failed_keywords?: number
           id?: string
+          processed_keyword_ids?: string[]
           processed_keywords?: number
           started_at?: string | null
           status?: string
@@ -116,10 +120,12 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          crawl_date?: string | null
           created_at?: string
           error_message?: string | null
           failed_keywords?: number
           id?: string
+          processed_keyword_ids?: string[]
           processed_keywords?: number
           started_at?: string | null
           status?: string

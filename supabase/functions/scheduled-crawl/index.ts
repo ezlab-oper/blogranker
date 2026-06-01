@@ -2,12 +2,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
+
+// 함수 timeout(~400초)을 고려한 청크 크기.
+// 키워드 1개 = 네이버+구글 = 2 operations × (firecrawl ~5초 + 딜레이 1~3초) ≈ 16초.
+// 15개 × 16초 = 240초 → 함수 timeout 마진 충분.
+const CHUNK_SIZE = 15;
 
 interface ScheduleSettings {
   enabled: boolean;
-  time: string;
+  time: string; // "HH:MM" KST
   interval: number;
 }
 
@@ -17,71 +22,56 @@ interface NotificationSettings {
   onError: boolean;
 }
 
-// Utility function for random delay
 function randomDelay(minMs: number, maxMs: number): Promise<void> {
   const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
   return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-// Fisher-Yates shuffle algorithm
 function shuffleArray<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
+  const a = [...array];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return shuffled;
+  return a;
 }
 
-// Send Slack notification
-async function sendSlackNotification(
-  webhookUrl: string,
-  message: string,
-  isError: boolean = false
-): Promise<void> {
-  if (!webhookUrl) return;
+// KST 오늘(YYYY-MM-DD) + KST HH:MM 반환
+function nowKst() {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const iso = kst.toISOString();
+  return { date: iso.slice(0, 10), hhmm: iso.slice(11, 16) };
+}
 
+async function sendSlack(url: string, message: string, isError = false) {
+  if (!url) return;
   try {
-    await fetch(webhookUrl, {
+    await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: `${isError ? '❌' : '✅'} [블로그 순위 추적기] ${message}`,
-        attachments: [
-          {
-            color: isError ? '#ff0000' : '#00ff00',
-            text: message,
-            ts: Math.floor(Date.now() / 1000),
-          },
-        ],
       }),
     });
-  } catch (error) {
-    console.error('Failed to send Slack notification:', error);
+  } catch (e) {
+    console.error('Slack 전송 실패:', e);
   }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  // ===== 1) X-Cron-Secret 검증 (무단 호출 차단) =====
+  // ===== 1) X-Cron-Secret 검증 =====
   const expectedSecret = Deno.env.get('CRON_SECRET');
   const providedSecret = req.headers.get('x-cron-secret') || '';
   if (!expectedSecret) {
-    console.error('CRON_SECRET 미설정 — 함수 거부');
-    return new Response(
-      JSON.stringify({ success: false, error: 'Server misconfiguration' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: false, error: 'Server misconfiguration' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
   if (providedSecret !== expectedSecret) {
-    console.warn('잘못된 X-Cron-Secret 헤더 — 거부');
-    return new Response(
-      JSON.stringify({ success: false, error: 'Forbidden' }),
-      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: false, error: 'Forbidden' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -89,220 +79,186 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    console.log('Scheduled crawl triggered at:', new Date().toISOString());
+    const { date: today, hhmm: nowHHMM } = nowKst();
+    console.log(`scheduled-crawl invoked (KST ${today} ${nowHHMM})`);
 
-    // ===== 2) 동시 실행 방지: 이미 진행 중인 crawl_jobs가 있으면 skip =====
-    // 60분 이내 시작된 'running' 작업만 살아있다고 판단 (그 이상은 stale로 간주)
-    const sixtyMinAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { data: runningJobs } = await supabase
+    // ===== 2) 설정 조회 =====
+    const { data: scheduleRow } = await supabase
+      .from('settings').select('value').eq('key', 'schedule').single();
+    const sched: ScheduleSettings = scheduleRow?.value || { enabled: false, time: '09:00', interval: 5 };
+
+    if (!sched.enabled) {
+      return new Response(JSON.stringify({ success: true, message: '비활성화됨' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== 3) 오늘 작업 조회 =====
+    const { data: todayJobs } = await supabase
       .from('crawl_jobs')
-      .select('id, started_at, processed_keywords, total_keywords')
-      .eq('status', 'running')
-      .gte('started_at', sixtyMinAgo)
+      .select('*')
+      .eq('crawl_date', today)
+      .order('started_at', { ascending: false })
       .limit(1);
-    if (runningJobs && runningJobs.length > 0) {
-      const j = runningJobs[0];
-      console.log(`이미 다른 수집 작업 진행 중 → skip (job ${j.id}, ${j.processed_keywords}/${j.total_keywords})`);
-      return new Response(
-        JSON.stringify({
-          success: true,
-          skipped: true,
-          reason: 'Another crawl job already running',
-          existing_job_id: j.id,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let job = todayJobs?.[0] ?? null;
+
+    // 오늘 작업이 이미 완료
+    if (job?.status === 'completed') {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: '오늘 작업 완료됨', job_id: job.id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (job?.status === 'failed' || job?.status === 'cancelled') {
+      return new Response(JSON.stringify({ success: true, skipped: true, reason: `오늘 작업 ${job.status}`, job_id: job.id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get schedule settings
-    const { data: scheduleData } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'schedule')
-      .single();
-
-    const scheduleSettings: ScheduleSettings = scheduleData?.value || { enabled: false };
-
-    if (!scheduleSettings.enabled) {
-      console.log('Scheduled crawl is disabled');
-      return new Response(
-        JSON.stringify({ success: true, message: 'Scheduled crawl is disabled' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // ===== 4) 새 작업이 필요한지 판정 =====
+    if (!job) {
+      // 아직 설정 시각 전이면 skip
+      if (nowHHMM < sched.time) {
+        return new Response(JSON.stringify({ success: true, skipped: true, reason: `설정 시각(${sched.time}) 전` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // 활성 키워드 수 미리 카운트해서 새 job 생성
+      const { count: kwCount } = await supabase
+        .from('keywords').select('id', { count: 'exact', head: true }).eq('is_active', true);
+      const total = kwCount || 0;
+      if (total === 0) {
+        return new Response(JSON.stringify({ success: true, skipped: true, reason: '활성 키워드 없음' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const { data: newJob, error: insErr } = await supabase
+        .from('crawl_jobs')
+        .insert({
+          status: 'running',
+          total_keywords: total,
+          started_at: new Date().toISOString(),
+          crawl_date: today,
+          processed_keyword_ids: [],
+        })
+        .select().single();
+      if (insErr || !newJob) {
+        return new Response(JSON.stringify({ success: false, error: '작업 생성 실패' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      job = newJob;
     }
 
-    // Get notification settings
-    const { data: notificationData } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'notifications')
-      .single();
+    // ===== 5) 미처리 키워드 선별 후 청크 처리 =====
+    const processedIds = new Set<string>((job.processed_keyword_ids as string[]) || []);
 
-    const notificationSettings: NotificationSettings = notificationData?.value || {
-      slackWebhook: '',
-      onComplete: false,
-      onError: false,
-    };
+    const { data: keywords } = await supabase
+      .from('keywords').select('*').eq('is_active', true);
+    const { data: engines } = await supabase
+      .from('search_engines').select('*').eq('is_active', true);
 
-    // Get active keywords
-    const { data: keywords, error: keywordsError } = await supabase
-      .from('keywords')
-      .select('*')
-      .eq('is_active', true);
-
-    if (keywordsError) throw keywordsError;
-
-    if (!keywords || keywords.length === 0) {
-      console.log('No active keywords to crawl');
-      return new Response(
-        JSON.stringify({ success: true, message: 'No active keywords' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!keywords || !engines) {
+      return new Response(JSON.stringify({ success: false, error: '키워드/엔진 조회 실패' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get active search engines
-    const { data: engines, error: enginesError } = await supabase
-      .from('search_engines')
-      .select('*')
-      .eq('is_active', true);
+    const pending = keywords.filter((k) => !processedIds.has(k.id));
+    const chunk = pending.slice(0, CHUNK_SIZE);
 
-    if (enginesError) throw enginesError;
+    if (chunk.length === 0) {
+      // 처리할 게 없으면 완료 처리
+      await supabase.from('crawl_jobs')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', job.id);
+      return new Response(JSON.stringify({ success: true, message: '완료 처리됨', job_id: job.id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
-    // Create crawl job
-    const { data: job, error: jobError } = await supabase
-      .from('crawl_jobs')
-      .insert({
-        status: 'running',
-        total_keywords: keywords.length,
-        started_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    let chunkSuccess = 0, chunkFail = 0;
 
-    if (jobError) throw jobError;
-
-    let successCount = 0;
-    let failCount = 0;
-    const totalTasks = keywords.length * (engines?.length || 0);
-
-    // Process keywords with randomized patterns
-    for (const keyword of keywords) {
-      // Shuffle engines for each keyword
-      const shuffledEngines = shuffleArray(engines || []);
-
-      for (const engine of shuffledEngines) {
+    for (const kw of chunk) {
+      const shuffled = shuffleArray(engines);
+      for (const engine of shuffled) {
         try {
-          // Random delay between requests (3-7 seconds)
           await randomDelay(3000, 7000);
-
-          // 엔진명 → 타입 매핑 (네이버/구글 지원)
           const lname = engine.name.toLowerCase();
           const engineType: 'naver' | 'google' | null =
             engine.name === '네이버' || lname.includes('naver') ? 'naver'
             : engine.name === '구글' || lname.includes('google') ? 'google'
             : null;
-          if (!engineType) {
-            console.log(`Skipping unsupported engine: ${engine.name}`);
-            continue;
-          }
+          if (!engineType) continue;
 
-          // Call scrape-search function
           const response = await fetch(`${supabaseUrl}/functions/v1/scrape-search`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${supabaseServiceKey}`,
             },
-            body: JSON.stringify({
-              keyword: keyword.keyword,
-              engine: engineType,
-            }),
+            body: JSON.stringify({ keyword: kw.keyword, engine: engineType }),
           });
-
           const data = await response.json();
 
           if (data.success && data.results) {
-            // Save results
-            for (const result of data.results) {
+            for (const r of data.results) {
               await supabase.from('crawl_results').insert({
                 job_id: job.id,
-                keyword_id: keyword.id,
+                keyword_id: kw.id,
                 search_engine_id: engine.id,
-                rank: result.rank,
-                blog_title: result.title,
-                blog_author: result.author,
-                blog_url: result.url,
-                snippet: result.snippet,
-                published_date: result.published_date,
-                blog_platform: result.platform,
-                thumbnail_url: result.thumbnail_url,
+                rank: r.rank,
+                blog_title: r.title,
+                blog_author: r.author,
+                blog_url: r.url,
+                snippet: r.snippet,
+                published_date: r.published_date,
+                blog_platform: r.platform,
+                thumbnail_url: r.thumbnail_url,
               });
             }
-            successCount++;
+            chunkSuccess++;
           } else {
-            failCount++;
-            console.error(`Failed to scrape ${keyword.keyword} on ${engine.name}:`, data.error);
+            chunkFail++;
+            console.error(`스크랩 실패 ${kw.keyword}/${engine.name}:`, data.error);
           }
-        } catch (error) {
-          failCount++;
-          console.error(`Error processing ${keyword.keyword} on ${engine.name}:`, error);
+        } catch (e) {
+          chunkFail++;
+          console.error(`처리 오류 ${kw.keyword}/${engine.name}:`, e);
         }
-
-        // Additional random delay between engines (1-3 seconds)
         await randomDelay(1000, 3000);
       }
-
-      // Update job progress
-      await supabase
-        .from('crawl_jobs')
+      // 키워드 단위로 즉시 processed_keyword_ids에 추가 (함수 중간 사망 시 손실 최소화)
+      processedIds.add(kw.id);
+      await supabase.from('crawl_jobs')
         .update({
-          processed_keywords: successCount + failCount,
-          successful_keywords: successCount,
-          failed_keywords: failCount,
+          processed_keyword_ids: Array.from(processedIds),
+          processed_keywords: processedIds.size,
         })
         .eq('id', job.id);
     }
 
-    // Complete job
-    const finalStatus = failCount === 0 ? 'completed' : failCount === totalTasks ? 'failed' : 'completed';
-    await supabase
-      .from('crawl_jobs')
-      .update({
-        status: finalStatus,
-        completed_at: new Date().toISOString(),
-        processed_keywords: successCount + failCount,
-        successful_keywords: successCount,
-        failed_keywords: failCount,
-      })
-      .eq('id', job.id);
+    // ===== 6) 모두 처리됐는지 확인 =====
+    const finishedNow = pending.length - chunk.length === 0;
+    if (finishedNow) {
+      await supabase.from('crawl_jobs')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', job.id);
 
-    // Send notification
-    const message = `스케줄 수집 ${finalStatus === 'completed' ? '완료' : '실패'}: ${successCount}/${totalTasks} 성공`;
-    
-    if (finalStatus === 'completed' && notificationSettings.onComplete) {
-      await sendSlackNotification(notificationSettings.slackWebhook, message, false);
-    } else if (finalStatus === 'failed' && notificationSettings.onError) {
-      await sendSlackNotification(notificationSettings.slackWebhook, message, true);
+      // Slack 알림 (설정 시)
+      const { data: notifRow } = await supabase
+        .from('settings').select('value').eq('key', 'notifications').single();
+      const notif: NotificationSettings = notifRow?.value || { slackWebhook: '', onComplete: false, onError: false };
+      if (notif.onComplete && notif.slackWebhook) {
+        await sendSlack(notif.slackWebhook, `오늘(${today}) 키워드 ${processedIds.size}개 수집 완료`);
+      }
     }
 
-    console.log('Scheduled crawl completed:', message);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message,
-        job_id: job.id,
-        stats: { success: successCount, failed: failCount, total: totalTasks },
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Scheduled crawl error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      job_id: job.id,
+      chunk_size: chunk.length,
+      chunk_success: chunkSuccess,
+      chunk_fail: chunkFail,
+      processed_total: processedIds.size,
+      total_keywords: job.total_keywords,
+      finished: finishedNow,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '알 수 없는 오류';
+    console.error('scheduled-crawl 오류:', msg);
+    return new Response(JSON.stringify({ success: false, error: msg }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

@@ -10,12 +10,10 @@ interface ScheduleRequest {
   time: string; // HH:MM format in KST
 }
 
-// Convert KST time to UTC cron expression
-function timeToCronExpression(time: string): string {
-  const [hours, minutes] = time.split(':').map(Number);
-  // KST is UTC+9, so subtract 9 hours
-  const utcHours = (hours - 9 + 24) % 24;
-  return `${minutes} ${utcHours} * * *`;
+// 매 30분 간격으로 트리거. scheduled-crawl 내부에서 settings.time 이후인지·오늘 작업 진행 상태를 보고 skip/이어받기 결정.
+// 청크 처리(한 번에 N개)이므로 자주 호출돼야 65개를 다 끝낼 수 있다.
+function chunkCronExpression(_time: string): string {
+  return '*/30 * * * *';
 }
 
 Deno.serve(async (req) => {
@@ -58,7 +56,7 @@ Deno.serve(async (req) => {
     console.log('Unschedule result:', await unscheduleResult.text());
 
     if (enabled) {
-      const cronExpression = timeToCronExpression(time);
+      const cronExpression = chunkCronExpression(time);
       
       // Schedule new job
       const scheduleResult = await fetch(`${supabaseUrl}/rest/v1/rpc/schedule_cron_job`, {
