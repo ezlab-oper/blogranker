@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
 import { useBloggers } from '@/hooks/useBloggers';
-import { useBlogUrls, OFFICIAL_BLOG_ID, extractBlogId } from '@/hooks/useBlogUrls';
+import { OFFICIAL_BLOG_ID, extractBlogId } from '@/hooks/useBlogUrls';
 import { format, subDays, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { TrendChartTooltip, type RankPoint } from './TrendChartTooltip';
@@ -72,16 +72,14 @@ export function RankTrendChart() {
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
   const { data: bloggers = [] } = useBloggers();
-  const { data: blogUrls = [] } = useBlogUrls();
 
-  // 우리 측 blog_id 집합: 공식블로그 + 협업 블로거 + 시트 동기화 blog_urls
+  // 우리 측 blog_id 집합: 공식블로그 + 협업 블로거
   const ourBlogIds = useMemo(() => {
     const s = new Set<string>();
     s.add(OFFICIAL_BLOG_ID);
     bloggers.forEach((b) => b.blog_id && s.add(b.blog_id));
-    blogUrls.forEach((u) => u.blog_id && s.add(u.blog_id));
     return s;
-  }, [bloggers, blogUrls]);
+  }, [bloggers]);
 
   // 결과 1건이 "우리 측"이고 스코프에 부합하는지
   const isInScope = useCallback(

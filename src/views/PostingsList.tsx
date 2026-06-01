@@ -12,6 +12,7 @@ import { usePostings, useAddPosting, useUpdatePosting, useDeletePosting, type Po
 import { useBloggers } from '@/hooks/useBloggers';
 import { PostingDialog } from '@/components/blog-posting/PostingDialog';
 import { PostingRankModal } from '@/components/blog-posting/PostingRankModal';
+import { PostingCsvUpload } from '@/components/blog-posting/PostingCsvUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -79,9 +80,12 @@ export default function PostingsList() {
             <p className="text-muted-foreground mt-1">협업 블로거의 포스팅 URL을 등록하고 관리합니다.</p>
           </div>
           {canPerformActions && (
-            <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2">
-              <PenSquare className="w-4 h-4" /> 포스팅 추가
-            </Button>
+            <div className="flex items-center gap-2">
+              <PostingCsvUpload />
+              <Button onClick={() => { setEditing(null); setDialogOpen(true); }} className="gap-2">
+                <PenSquare className="w-4 h-4" /> 포스팅 추가
+              </Button>
+            </div>
           )}
         </motion.div>
 

@@ -14,33 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      blog_urls: {
-        Row: {
-          blog_id: string | null
-          blog_url: string
-          created_at: string
-          id: string
-          program: string
-          updated_at: string
-        }
-        Insert: {
-          blog_id?: string | null
-          blog_url: string
-          created_at?: string
-          id?: string
-          program: string
-          updated_at?: string
-        }
-        Update: {
-          blog_id?: string | null
-          blog_url?: string
-          created_at?: string
-          id?: string
-          program?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       bloggers: {
         Row: {
           blog_grade: Database["public"]["Enums"]["blog_grade"] | null

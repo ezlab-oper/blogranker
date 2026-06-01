@@ -20,7 +20,9 @@ import {
 } from '@/components/ui/select';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
-import { useBlogUrls, buildBlogUrlMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
+import { buildMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
+import { useBloggers } from '@/hooks/useBloggers';
+import { usePostings } from '@/hooks/usePostings';
 import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
@@ -71,15 +73,13 @@ export function ResultsTable({
     keyword_id: selectedKeywordId || undefined,
   });
   const { data: allKeywords } = useKeywords();
-  const { data: blogUrls } = useBlogUrls();
+  const { data: bloggers = [] } = useBloggers();
+  const { data: postings = [] } = usePostings();
   const { data: searchEngines } = useSearchEngines();
   const { getVolume } = useKeywordSearchVolume();
 
-  // Build URL matchers for highlighting
-  const matchers = useMemo(() => {
-    if (!blogUrls || blogUrls.length === 0) return null;
-    return buildBlogUrlMatchers(blogUrls);
-  }, [blogUrls]);
+  // 매칭 빌더: postings(협업 포스팅) + bloggers(협업 블로거) 단일 소스
+  const matchers = useMemo(() => buildMatchers(postings, bloggers), [postings, bloggers]);
 
   // Filter keywords by selected program
   const filteredKeywords = useMemo(() => {
@@ -324,9 +324,7 @@ export function ResultsTable({
             </TableHeader>
             <TableBody>
               {paginatedResults.map((result, index) => {
-                const matchType: MatchType = matchers
-                  ? getMatchType(result.blog_url, result.keyword?.program || null, matchers)
-                  : 'none';
+                const matchType: MatchType = getMatchType(result.blog_url, matchers);
 
                 const rowBg = matchType === 'official_blog'
                   ? 'bg-violet-500/10 hover:bg-violet-500/15'

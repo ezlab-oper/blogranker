@@ -20,25 +20,16 @@ export interface ScrapingSettings {
   userAgentRotation: boolean;
 }
 
-// 협업 블로그 목록을 가져오는 구글 시트 연동 설정
-export interface BlogSheetSettings {
-  spreadsheetId: string; // 스프레드시트 ID (URL의 /d/<여기>/edit)
-  urlColumn: string;     // 협업 포스팅 URL이 있는 열 (예: E)
-  blogIdColumn: string;  // 블로그 ID가 있는 열 (비우면 URL에서 자동 추출)
-}
-
 export interface AllSettings {
   schedule: ScheduleSettings;
   notifications: NotificationSettings;
   scraping: ScrapingSettings;
-  blogSheet: BlogSheetSettings;
 }
 
 const defaultSettings: AllSettings = {
   schedule: { time: '09:00', interval: 5, enabled: false, cronJobName: '' },
   notifications: { slackWebhook: '', onComplete: false, onError: true },
   scraping: { maxRetries: 3, userAgentRotation: true },
-  blogSheet: { spreadsheetId: '', urlColumn: 'E', blogIdColumn: '' },
 };
 
 function parseSettingValue<T>(value: Json | null | undefined, defaultValue: T): T {
@@ -80,7 +71,6 @@ export function useSettings() {
         schedule: parseSettingValue<ScheduleSettings>(settingsMap.schedule, defaultSettings.schedule),
         notifications: parseSettingValue<NotificationSettings>(settingsMap.notifications, defaultSettings.notifications),
         scraping: parseSettingValue<ScrapingSettings>(settingsMap.scraping, defaultSettings.scraping),
-        blogSheet: parseSettingValue<BlogSheetSettings>(settingsMap.blogSheet, defaultSettings.blogSheet),
       };
     },
   });
@@ -91,10 +81,8 @@ export function useSettings() {
         { key: 'schedule', value: newSettings.schedule as unknown as Json },
         { key: 'notifications', value: newSettings.notifications as unknown as Json },
         { key: 'scraping', value: newSettings.scraping as unknown as Json },
-        { key: 'blogSheet', value: newSettings.blogSheet as unknown as Json },
       ];
 
-      // upsert: 누락된 키(예: blogSheet)는 새로 생성된다
       const { error } = await supabase
         .from('settings')
         .upsert(updates, { onConflict: 'key' });

@@ -77,6 +77,25 @@ export function useUpdatePosting() {
   });
 }
 
+// CSV 등 다건 등록. blog_id는 URL에서 자동 추출.
+// 매칭된 블로거 ID를 외부에서 주입 가능 (bloggers를 매번 다시 조회 안 해도 됨).
+export function useBulkAddPostings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: PostingInput[]) => {
+      if (rows.length === 0) return [] as Posting[];
+      const normalized = rows.map((r) => ({
+        ...r,
+        blog_id: r.blog_id ?? extractBlogId(r.posting_url),
+      }));
+      const { data, error } = await supabase.from('postings').insert(normalized).select();
+      if (error) throw error;
+      return (data as Posting[]) || [];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['postings'] }),
+  });
+}
+
 export function useDeletePosting() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Loader2, Square, RefreshCw } from 'lucide-react';
+import { Play, Loader2, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ResultsTable } from '@/components/results/ResultsTable';
@@ -11,7 +11,6 @@ import { useRunningCrawlJob } from '@/hooks/useCrawlResults';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { runCrawlJob, cancelCrawlJob, CrawlProgress } from '@/lib/api/scraper';
-import { useSyncBlogUrls } from '@/hooks/useBlogUrls';
 import { cn } from '@/lib/utils';
 
 export default function Results() {
@@ -21,7 +20,6 @@ export default function Results() {
   const queryClient = useQueryClient();
   const [isCrawling, setIsCrawling] = useState(false);
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
-  const syncBlogUrls = useSyncBlogUrls();
   const { data: runningJob } = useRunningCrawlJob();
   // 내 클릭이 아니면서 다른 작업이 진행 중인 경우
   const blockedByOther = !!runningJob && !isCrawling;
@@ -74,13 +72,6 @@ export default function Results() {
     setIsCrawling(true);
     setCrawlProgress(null);
 
-    // Auto-sync blog URLs before crawling
-    try {
-      await syncBlogUrls.mutateAsync();
-    } catch (e) {
-      console.warn('Blog URL sync failed, continuing with crawl:', e);
-    }
-
     toast({ title: '수집 시작', description: `${crawlTargets.length}개 키워드 수집을 시작합니다.` });
 
     try {
@@ -128,15 +119,6 @@ export default function Results() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => syncBlogUrls.mutate()}
-              disabled={syncBlogUrls.isPending}
-            >
-              <RefreshCw className={cn("w-4 h-4", syncBlogUrls.isPending && "animate-spin")} />
-              URL 동기화
-            </Button>
             <Button
               className="gradient-primary text-white gap-2"
               onClick={handleStartCrawl}
