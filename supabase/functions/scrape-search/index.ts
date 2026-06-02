@@ -1,14 +1,42 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseNaverIntegratedResults } from "./parser.ts";
 import { parseGoogleResults } from "./parser_google.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+// verify_jwt=off 하에서 본문 검증.
+// 통과 조건: ① X-Cron-Secret 헤더가 CRON_SECRET과 일치, 또는 ② Authorization Bearer가 유효한 user JWT.
+async function authorize(req: Request): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const cronSecretExpected = Deno.env.get('CRON_SECRET');
+  const cronSecretProvided = req.headers.get('x-cron-secret') || '';
+  if (cronSecretExpected && cronSecretProvided && cronSecretProvided === cronSecretExpected) {
+    return { ok: true };
+  }
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '');
+  if (!token) return { ok: false, status: 401, error: 'Missing credentials' };
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !supabaseAnon) return { ok: false, status: 500, error: 'Server misconfiguration' };
+  const supa = createClient(supabaseUrl, supabaseAnon, { global: { headers: { Authorization: `Bearer ${token}` } } });
+  const { data, error } = await supa.auth.getUser(token);
+  if (error || !data?.user) return { ok: false, status: 401, error: 'Invalid token' };
+  return { ok: true };
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const auth = await authorize(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ success: false, error: auth.error }),
+      { status: auth.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   try {

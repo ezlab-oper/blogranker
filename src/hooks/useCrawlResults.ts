@@ -20,6 +20,8 @@ export function useSearchEngines() {
 export function useCrawlResults(filters?: {
   keyword_id?: string;
   latestOnly?: boolean;
+  // KST 기준 YYYY-MM-DD. 지정 시 그날 0시~익일 0시(KST) 범위로 서버에서 필터.
+  crawl_date?: string;
 }) {
   return useQuery({
     queryKey: ['crawl_results', filters],
@@ -32,10 +34,20 @@ export function useCrawlResults(filters?: {
           search_engine:search_engines(*)
         `)
         .order('crawled_at', { ascending: false })
-        .limit(1000);
+        .limit(2000);
 
       if (filters?.keyword_id) {
         query = query.eq('keyword_id', filters.keyword_id);
+      }
+
+      if (filters?.crawl_date) {
+        // KST 자정 → UTC ISO. KST = UTC+9.
+        const [y, m, d] = filters.crawl_date.split('-').map(Number);
+        const startUtcMs = Date.UTC(y, m - 1, d, -9, 0, 0);
+        const endUtcMs = startUtcMs + 24 * 60 * 60 * 1000;
+        query = query
+          .gte('crawled_at', new Date(startUtcMs).toISOString())
+          .lt('crawled_at', new Date(endUtcMs).toISOString());
       }
 
       const { data, error } = await query;

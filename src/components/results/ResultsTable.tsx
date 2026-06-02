@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, User, FileText, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ExternalLink, User, FileText, Download, ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Table,
   TableBody,
@@ -54,6 +56,26 @@ interface ResultsTableProps {
   onSelectedKeywordIdChange: (v: string) => void;
   selectedEngine: string;
   onSelectedEngineChange: (v: string) => void;
+  // KST YYYY-MM-DD
+  selectedDate: string;
+  onSelectedDateChange: (v: string) => void;
+}
+
+// KST 자정 기준 오늘 YYYY-MM-DD
+function todayKstString(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+// 'YYYY-MM-DD' KST → Date (그날 자정 KST를 표현하는 Date 객체, Calendar 표시용)
+function dateFromKstString(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function kstStringFromDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function ResultsTable({
@@ -64,13 +86,17 @@ export function ResultsTable({
   onSelectedKeywordIdChange,
   selectedEngine,
   onSelectedEngineChange,
+  selectedDate,
+  onSelectedDateChange,
 }: ResultsTableProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   const { data: results, isLoading } = useCrawlResults({
     keyword_id: selectedKeywordId || undefined,
+    crawl_date: selectedDate || undefined,
   });
   const { data: allKeywords } = useKeywords();
   const { data: bloggers = [] } = useBloggers();
@@ -236,12 +262,37 @@ export function ResultsTable({
           </SelectContent>
         </Select>
 
+        {/* Date filter (single day, KST) */}
+        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-44 justify-start gap-2 font-normal">
+              <CalendarIcon className="w-4 h-4" />
+              {selectedDate || '날짜 선택'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 bg-popover" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedDate ? dateFromKstString(selectedDate) : undefined}
+              onSelect={(d) => {
+                if (d) {
+                  onSelectedDateChange(kstStringFromDate(d));
+                  setCurrentPage(1);
+                  setDatePopoverOpen(false);
+                }
+              }}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+
         <Button
           variant="outline"
           onClick={() => {
             onSelectedProgramChange('');
             onSelectedKeywordIdChange('');
             onSelectedEngineChange('');
+            onSelectedDateChange(todayKstString());
             setCurrentPage(1);
           }}
         >
@@ -430,8 +481,10 @@ export function ResultsTable({
       ) : (
         <div className="text-center py-16 text-muted-foreground bg-card rounded-xl border shadow-card">
           <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium mb-1">수집된 결과가 없습니다</p>
-          <p className="text-sm">상단의 프로그램과 키워드를 선택한 후 '수집 시작' 버튼을 눌러주세요</p>
+          <p className="text-lg font-medium mb-1">
+            {selectedDate ? `${selectedDate} 수집된 결과가 없습니다` : '수집된 결과가 없습니다'}
+          </p>
+          <p className="text-sm">다른 날짜를 선택하거나 '수집 시작' 버튼으로 새 수집을 실행하세요</p>
         </div>
       )}
 

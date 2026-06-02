@@ -13,3 +13,8 @@ verify_jwt = false
 # 함수 본문에서 별도 secret 검증으로 무단 호출 차단 가능.
 [functions.scheduled-crawl]
 verify_jwt = false
+
+# scheduled-crawl이 fetch로 호출. 신형 키 호환을 위해 verify_jwt=off + X-Cron-Secret 검증.
+# 사용자 직접 호출(키워드 수집 페이지)은 user JWT를 함수 본문에서 supabase-js로 재검증.
+[functions.scrape-search]
+verify_jwt = false

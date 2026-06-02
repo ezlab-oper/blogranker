@@ -28,6 +28,13 @@ export default function Results() {
   const [selectedProgram, setSelectedProgram] = useState('');
   const [selectedKeywordId, setSelectedKeywordId] = useState('');
   const [selectedEngine, setSelectedEngine] = useState('');
+  // KST 기준 오늘(YYYY-MM-DD)
+  const todayKst = useMemo(() => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().slice(0, 10);
+  }, []);
+  const [selectedDate, setSelectedDate] = useState<string>(todayKst);
 
   // Determine which keywords to crawl based on filters
   const crawlTargets = useMemo(() => {
@@ -193,6 +200,8 @@ export default function Results() {
           onSelectedKeywordIdChange={setSelectedKeywordId}
           selectedEngine={selectedEngine}
           onSelectedEngineChange={setSelectedEngine}
+          selectedDate={selectedDate}
+          onSelectedDateChange={setSelectedDate}
         />
       </div>
     </AppLayout>

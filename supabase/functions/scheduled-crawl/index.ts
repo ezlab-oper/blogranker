@@ -187,6 +187,7 @@ Deno.serve(async (req) => {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${supabaseServiceKey}`,
+              'X-Cron-Secret': expectedSecret,
             },
             body: JSON.stringify({ keyword: kw.keyword, engine: engineType }),
           });
@@ -229,7 +230,38 @@ Deno.serve(async (req) => {
         .eq('id', job.id);
     }
 
-    // ===== 6) 모두 처리됐는지 확인 =====
+    // ===== 6) 빈 완료 가드: 청크 전부 실패면 즉시 job=failed로 마감 =====
+    // (scrape-search 인증 실패·Firecrawl 다운 등으로 65/65 "완료"되지만 0건 insert 사고 방지)
+    const totalOps = chunk.length * engines.length;
+    const failRate = totalOps > 0 ? chunkFail / totalOps : 0;
+    if (chunkSuccess === 0 && chunkFail > 0) {
+      await supabase.from('crawl_jobs')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: `청크 전부 실패 (${chunkFail}/${totalOps}). scrape-search 또는 의존 서비스 점검 필요.`,
+        })
+        .eq('id', job.id);
+
+      const { data: notifRow } = await supabase
+        .from('settings').select('value').eq('key', 'notifications').single();
+      const notif: NotificationSettings = notifRow?.value || { slackWebhook: '', onComplete: false, onError: false };
+      if (notif.onError && notif.slackWebhook) {
+        await sendSlack(notif.slackWebhook, `자동 수집 실패 — 청크 ${chunkFail}/${totalOps} 전부 실패. job_id=${job.id}`, true);
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        job_id: job.id,
+        error: 'chunk all failed',
+        chunk_size: chunk.length,
+        chunk_success: chunkSuccess,
+        chunk_fail: chunkFail,
+        fail_rate: failRate,
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ===== 7) 모두 처리됐는지 확인 =====
     const finishedNow = pending.length - chunk.length === 0;
     if (finishedNow) {
       await supabase.from('crawl_jobs')
