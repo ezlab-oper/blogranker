@@ -63,10 +63,13 @@ export function RankTrendChart() {
   const [hoveredDate, setHoveredDate] = useState<string>('');
   const [pinnedDate, setPinnedDate] = useState<string>('');
 
-  const cutoffIso = useMemo(
-    () => subDays(new Date(), parseInt(dateRange)).toISOString(),
-    [dateRange]
-  );
+  // 기간 시작 = N일 전 KST 자정 (날짜 경계까지 포함해서 N일 전 자정부터)
+  const cutoffIso = useMemo(() => {
+    const now = new Date();
+    const kstMs = now.getTime() + 9 * 60 * 60 * 1000;
+    const kstStartOfDay = Math.floor(kstMs / 86400000) * 86400000 - (parseInt(dateRange) - 1) * 86400000;
+    return new Date(kstStartOfDay - 9 * 60 * 60 * 1000).toISOString();
+  }, [dateRange]);
 
   const { data: results, isLoading } = useCrawlResults({ latestOnly: false, crawled_after: cutoffIso });
   const { data: keywords } = useKeywords();
