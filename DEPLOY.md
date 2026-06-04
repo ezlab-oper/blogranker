@@ -7,7 +7,7 @@
 ## 0. 사전 요구
 
 - Node.js 18.18+ (Next.js 14 요구사항). Netlify는 `NODE_VERSION` 환경변수로 지정 권장.
-- Supabase 프로젝트: `qsxjhiqmxeuuosaivbry`
+- Supabase 프로젝트: `txhkcaasbedzbdstsvco`
 - Deno (Edge Function 로컬 테스트용, 선택): https://deno.land
 
 ---
@@ -31,9 +31,9 @@ Netlify > Site configuration > Environment variables 에 추가:
 
 | Key | Value |
 |-----|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://qsxjhiqmxeuuosaivbry.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://txhkcaasbedzbdstsvco.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | (Supabase anon key) |
-| `NEXT_PUBLIC_SUPABASE_PROJECT_ID` | `qsxjhiqmxeuuosaivbry` |
+| `NEXT_PUBLIC_SUPABASE_PROJECT_ID` | `txhkcaasbedzbdstsvco` |
 | `NODE_VERSION` | `20` |
 
 > `NEXT_PUBLIC_*` 는 클라이언트 번들에 포함되는 공개 값이다(anon 키는 원래 공개용).
@@ -49,7 +49,7 @@ Supabase > Authentication > URL Configuration 에 Netlify 도메인을 Site URL 
 ### 2-1. CLI 준비
 ```sh
 npx supabase login            # 액세스 토큰 입력
-npx supabase link --project-ref qsxjhiqmxeuuosaivbry
+npx supabase link --project-ref txhkcaasbedzbdstsvco
 ```
 
 ### 2-2. DB 마이그레이션 적용 (보안 패치 포함)
