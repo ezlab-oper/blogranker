@@ -179,14 +179,22 @@ export function RankTrendChart() {
     [resultDetailsMap]
   );
 
-  // 우리 결과가 한 번이라도 등장한 키워드만 표시 대상
+  // 우리 결과가 한 번이라도 등장한 키워드 — 기간 내 매칭 "일 수"가 많은 순으로 정렬.
+  // (옛 구현은 crawled_at DESC 순이라 최신 1배치에만 잡힌 키워드가 앞에 와서, 자동 선택 시
+  //  그 키워드만 X축에 1점으로 나오는 문제가 있었다.)
   const displayKeywordIds = useMemo(() => {
-    const ids = new Set<string>();
-    ourResults.forEach((r) => ids.add(r.keyword_id));
-    return Array.from(ids);
+    const daysByKw = new Map<string, Set<string>>();
+    ourResults.forEach((r) => {
+      const date = format(parseISO(r.crawled_at), 'yyyy-MM-dd');
+      if (!daysByKw.has(r.keyword_id)) daysByKw.set(r.keyword_id, new Set());
+      daysByKw.get(r.keyword_id)!.add(date);
+    });
+    return [...daysByKw.entries()]
+      .sort((a, b) => b[1].size - a[1].size)
+      .map(([kwId]) => kwId);
   }, [ourResults]);
 
-  // 활성 키워드(선택값 우선, 미선택 시 자동 5개)
+  // 활성 키워드(선택값 우선, 미선택 시 데이터 풍부한 상위 5개 자동)
   const activeKeywords = useMemo(
     () => (selectedKeywords.length === 0 ? displayKeywordIds.slice(0, 5) : selectedKeywords),
     [selectedKeywords, displayKeywordIds]
