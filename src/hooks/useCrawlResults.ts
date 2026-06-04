@@ -22,10 +22,14 @@ export function useCrawlResults(filters?: {
   latestOnly?: boolean;
   // KST 기준 YYYY-MM-DD. 지정 시 그날 0시~익일 0시(KST) 범위로 서버에서 필터.
   crawl_date?: string;
+  // ISO timestamp. 지정 시 crawled_at >= 이 값. (기간 그래프용 — 서버에서 잘라 limit 절약)
+  crawled_after?: string;
 }) {
   return useQuery({
     queryKey: ['crawl_results', filters],
     queryFn: async () => {
+      // 기간 필터 있으면 서버에서 좁히므로 큰 limit 허용, 없으면 2000으로 절약.
+      const limit = filters?.crawled_after || filters?.crawl_date ? 20000 : 2000;
       let query = supabase
         .from('crawl_results')
         .select(`
@@ -34,7 +38,7 @@ export function useCrawlResults(filters?: {
           search_engine:search_engines(*)
         `)
         .order('crawled_at', { ascending: false })
-        .limit(2000);
+        .limit(limit);
 
       if (filters?.keyword_id) {
         query = query.eq('keyword_id', filters.keyword_id);
@@ -48,6 +52,8 @@ export function useCrawlResults(filters?: {
         query = query
           .gte('crawled_at', new Date(startUtcMs).toISOString())
           .lt('crawled_at', new Date(endUtcMs).toISOString());
+      } else if (filters?.crawled_after) {
+        query = query.gte('crawled_at', filters.crawled_after);
       }
 
       const { data, error } = await query;

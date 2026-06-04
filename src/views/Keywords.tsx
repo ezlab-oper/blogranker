@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, BarChart3, Loader2, Search } from 'lucide-react';
+import { Plus, BarChart3, Loader2, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { KeywordTable } from '@/components/keywords/KeywordTable';
 import { KeywordDialog } from '@/components/keywords/KeywordDialog';
 import { KeywordFilterBar } from '@/components/keywords/KeywordFilterBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { useKeywords } from '@/hooks/useKeywords';
+import { useKeywords, useBulkSetKeywordsActive } from '@/hooks/useKeywords';
 import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import type { Keyword, KeywordCategory } from '@/types/database';
 
@@ -21,6 +25,8 @@ export default function Keywords() {
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
   const [selectedPrograms, setSelectedPrograms] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [bulkConfirm, setBulkConfirm] = useState<null | { is_active: boolean }>(null);
+  const bulkSetActive = useBulkSetKeywordsActive();
 
   // 페이지 로드 시 검색량 자동 조회
   useEffect(() => {
@@ -68,7 +74,25 @@ export default function Keywords() {
               추적할 키워드를 등록하고 관리하세요
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => setBulkConfirm({ is_active: true })}
+              variant="outline"
+              className="gap-2"
+              disabled={!canPerformActions || bulkSetActive.isPending || filteredKeywords.length === 0}
+            >
+              <ToggleRight className="w-4 h-4 text-emerald-600" />
+              모두 켜기
+            </Button>
+            <Button
+              onClick={() => setBulkConfirm({ is_active: false })}
+              variant="outline"
+              className="gap-2"
+              disabled={!canPerformActions || bulkSetActive.isPending || filteredKeywords.length === 0}
+            >
+              <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+              모두 끄기
+            </Button>
             <Button
               onClick={handleFetchSearchVolume}
               variant="outline"
@@ -121,6 +145,39 @@ export default function Keywords() {
 
         {/* Dialog */}
         <KeywordDialog open={dialogOpen} onOpenChange={handleDialogClose} editData={editData} />
+
+        {/* Bulk activate/deactivate confirmation */}
+        <AlertDialog open={!!bulkConfirm} onOpenChange={(o) => { if (!o) setBulkConfirm(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {bulkConfirm?.is_active ? '키워드 일괄 활성화' : '키워드 일괄 비활성화'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                현재 필터 기준의 <strong>{filteredKeywords.length}개</strong> 키워드를{' '}
+                {bulkConfirm?.is_active ? '활성화' : '비활성화'}합니다.
+                {selectedPrograms.length === 0 && selectedCategories.length === 0
+                  ? ' (필터 미적용 — 전체 키워드 대상)'
+                  : ''}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!bulkConfirm) return;
+                  await bulkSetActive.mutateAsync({
+                    ids: filteredKeywords.map((k) => k.id),
+                    is_active: bulkConfirm.is_active,
+                  });
+                  setBulkConfirm(null);
+                }}
+              >
+                확인
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

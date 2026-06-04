@@ -92,6 +92,30 @@ export function useUpdateKeyword() {
   });
 }
 
+export function useBulkSetKeywordsActive() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ ids, is_active }: { ids: string[]; is_active: boolean }) => {
+      if (ids.length === 0) return { count: 0 };
+      const { error, count } = await supabase
+        .from('keywords')
+        .update({ is_active }, { count: 'exact' })
+        .in('id', ids);
+      if (error) throw error;
+      return { count: count ?? ids.length };
+    },
+    onSuccess: ({ count }, { is_active }) => {
+      queryClient.invalidateQueries({ queryKey: ['keywords'] });
+      toast({ title: `${count}개 키워드 ${is_active ? '활성화' : '비활성화'} 완료` });
+    },
+    onError: (error: Error) => {
+      toast({ title: '일괄 변경 실패', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 export function useDeleteKeyword() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

@@ -68,7 +68,7 @@ export function RankTrendChart() {
     [dateRange]
   );
 
-  const { data: results, isLoading } = useCrawlResults({ latestOnly: false });
+  const { data: results, isLoading } = useCrawlResults({ latestOnly: false, crawled_after: cutoffIso });
   const { data: keywords } = useKeywords();
   const { data: engines } = useSearchEngines();
   const { data: bloggers = [] } = useBloggers();
