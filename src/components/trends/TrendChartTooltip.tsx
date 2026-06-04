@@ -6,6 +6,14 @@ interface TooltipPayload {
   dataKey: string;
   value: number;
   color: string;
+  // Recharts가 ChartDataPoint 전체를 payload로 함께 전달.
+  // jitter 적용 전 원본 rank는 `_rank_<kwId>`에 저장돼 있어 그것을 우선 사용.
+  payload?: Record<string, unknown>;
+}
+
+function getDisplayRank(entry: TooltipPayload): number {
+  const orig = entry.payload?.[`_rank_${entry.dataKey}`];
+  return typeof orig === 'number' ? orig : entry.value;
 }
 
 export interface RankPoint {
@@ -54,8 +62,9 @@ export function TrendChartTooltip({
       <div className="space-y-3">
         {/* 순위 높은 항목(낮은 숫자)부터 정렬 */}
         {[...payload]
-          .sort((a, b) => (a.value ?? Infinity) - (b.value ?? Infinity))
+          .sort((a, b) => (getDisplayRank(a) ?? Infinity) - (getDisplayRank(b) ?? Infinity))
           .map((entry) => {
+            const displayRank = getDisplayRank(entry);
             const keywordName = getKeywordName(entry.dataKey);
             const details = getResultDetails(entry.dataKey, currentDate);
             const trajectory = getRankTrajectory(entry.dataKey, currentDate, 7);
@@ -81,7 +90,7 @@ export function TrendChartTooltip({
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-sm truncate max-w-[210px]">{keywordName}</span>
                   <span className="font-bold text-sm" style={{ color: entry.color }}>
-                    {entry.value}위
+                    {displayRank}위
                   </span>
                 </div>
 

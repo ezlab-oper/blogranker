@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceArea,
   ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -207,10 +208,6 @@ export function RankTrendChart() {
 
   // 차트 데이터
   const { chartData, keywordStats } = useMemo(() => {
-    if (ourResults.length === 0) {
-      return { chartData: [], keywordStats: {} as Record<string, { first: number; last: number; change: number }> };
-    }
-
     // 날짜별 키워드별 최저 rank
     const dateKwRank = new Map<string, Map<string, number>>();
     ourResults.forEach((r) => {
@@ -222,16 +219,33 @@ export function RankTrendChart() {
       if (prev === undefined || r.rank < prev) m.set(r.keyword_id, r.rank);
     });
 
-    const sortedDates = Array.from(dateKwRank.keys()).sort();
-    const data: ChartDataPoint[] = sortedDates.map((date) => {
+    // X축 = dateRange 전 일자 (KST). 데이터 없는 날도 표시.
+    const days = parseInt(dateRange);
+    const allDates: string[] = [];
+    const nowKstMs = Date.now() + 9 * 60 * 60 * 1000;
+    const todayKstStart = Math.floor(nowKstMs / 86400000) * 86400000;
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(todayKstStart - i * 86400000 - 9 * 60 * 60 * 1000);
+      allDates.push(format(d, 'yyyy-MM-dd'));
+    }
+
+    // 같은 순위에 키워드가 겹치면 선이 하나로 보임 → 키워드별로 작은 y offset 적용.
+    // 원본 rank는 `_rank_<kwId>`에 저장해 Tooltip이 그대로 표시.
+    const n = activeKeywords.length;
+    const jitterStep = 0.15;
+    const data: ChartDataPoint[] = allDates.map((date) => {
       const point: ChartDataPoint = {
         date,
         dateLabel: format(parseISO(date), 'MM/dd', { locale: ko }),
       };
-      const m = dateKwRank.get(date)!;
-      activeKeywords.forEach((kwId) => {
-        const v = m.get(kwId);
-        if (v !== undefined) point[kwId] = v;
+      const m = dateKwRank.get(date);
+      activeKeywords.forEach((kwId, i) => {
+        const v = m?.get(kwId);
+        if (v !== undefined) {
+          const offset = (i - (n - 1) / 2) * jitterStep;
+          point[kwId] = v + offset;
+          point[`_rank_${kwId}`] = v;
+        }
       });
       return point;
     });
@@ -239,8 +253,9 @@ export function RankTrendChart() {
     // 키워드별 통계: 첫/마지막 등장 + 변화량
     const stats: Record<string, { first: number; last: number; change: number }> = {};
     activeKeywords.forEach((kwId) => {
+      // jitter 적용 전 원본 rank 사용 (`_rank_<kwId>`).
       const values = data
-        .map((d) => d[kwId] as number | undefined)
+        .map((d) => d[`_rank_${kwId}`] as number | undefined)
         .filter((v): v is number => v !== undefined);
       if (values.length >= 1) {
         const first = values[0];
@@ -250,7 +265,7 @@ export function RankTrendChart() {
     });
 
     return { chartData: data, keywordStats: stats };
-  }, [ourResults, activeKeywords]);
+  }, [ourResults, activeKeywords, dateRange]);
 
   const handleKeywordToggle = (kwId: string) => {
     setSelectedKeywords((prev) => {
@@ -311,11 +326,16 @@ export function RankTrendChart() {
             if (d) setPinnedDate(d);
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+          {/* 등수별 줄무늬: 짝수 등수만 연한 회색 영역, 홀수는 흰 배경 */}
+          {[2, 4, 6, 8, 10].map((r) => (
+            <ReferenceArea key={r} y1={r - 0.5} y2={r + 0.5} fill="#9ca3af" fillOpacity={0.08} ifOverflow="hidden" />
+          ))}
+          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
           <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} className="text-muted-foreground" />
           <YAxis
             reversed
-            domain={[1, 10]}
+            domain={[0.5, 10.5]}
+            ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
             allowDecimals={false}
             tick={{ fontSize: 12 }}
             label={{
