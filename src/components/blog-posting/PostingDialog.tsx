@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { extractBlogId } from '@/hooks/useBlogUrls';
+import { supabase } from '@/integrations/supabase/client';
 import type { Blogger } from '@/hooks/useBloggers';
 import type { Posting, PostingInput } from '@/hooks/usePostings';
 import { useKeywords } from '@/hooks/useKeywords';
-import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
+import { usePrograms } from '@/hooks/usePrograms';
 
 interface Props {
   open: boolean;
@@ -38,21 +39,59 @@ function parseKeywords(raw: string): string[] {
 export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit, isPending }: Props) {
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
+  const [publishedDate, setPublishedDate] = useState(''); // YYYY-MM-DD (KST)
   const [manualBloggerId, setManualBloggerId] = useState<string>('');
   const [program, setProgram] = useState<string>('');
   const [keywordsText, setKeywordsText] = useState<string>('');
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const lastFetchedUrl = useRef<string>('');
 
   const { data: registeredKeywords = [] } = useKeywords();
+  const { data: programs = [] } = usePrograms();
 
   useEffect(() => {
     if (open) {
       setUrl(initial?.posting_url || '');
       setTitle(initial?.title || '');
+      const pub = initial?.published_at ? new Date(initial.published_at) : null;
+      setPublishedDate(pub ? pub.toISOString().slice(0, 10) : '');
       setManualBloggerId(initial?.blogger_id || '');
       setProgram(initial?.program || '');
       setKeywordsText((initial?.target_keywords || []).join(', '));
+      lastFetchedUrl.current = initial?.posting_url || '';
+      setMetaError(null);
     }
   }, [open, initial]);
+
+  // URL 확정(blur or 디바운스) 시 fetch-post-meta 호출 → 제목·발행일 자동 채움
+  const fetchMeta = async (targetUrl: string) => {
+    const trimmed = targetUrl.trim();
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) return;
+    if (trimmed === lastFetchedUrl.current) return;
+    lastFetchedUrl.current = trimmed;
+    setFetchingMeta(true);
+    setMetaError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-post-meta', {
+        body: { url: trimmed },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        if (data.title) setTitle((prev) => prev || data.title);
+        if (data.published_at) {
+          const d = new Date(data.published_at);
+          if (!isNaN(d.getTime())) {
+            setPublishedDate((prev) => prev || d.toISOString().slice(0, 10));
+          }
+        }
+      }
+    } catch (e) {
+      setMetaError(e instanceof Error ? e.message : '메타 추출 실패');
+    } finally {
+      setFetchingMeta(false);
+    }
+  };
 
   // URL → 블로거 자동 매칭
   const autoMatch = useMemo<Blogger | null>(() => {
@@ -107,12 +146,20 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    // 발행일 = KST 자정 ISO. 비어있으면 null.
+    let published_at: string | null = null;
+    if (publishedDate) {
+      const [y, m, d] = publishedDate.split('-').map(Number);
+      // KST 자정 = UTC -9h
+      published_at = new Date(Date.UTC(y, m - 1, d, -9, 0, 0)).toISOString();
+    }
     await onSubmit({
       posting_url: url.trim(),
       title: title.trim() || null,
       blogger_id: effectiveBloggerId,
       program: program || null,
       target_keywords: parsedKeywords.length > 0 ? parsedKeywords : null,
+      published_at,
     });
   };
 
@@ -127,8 +174,23 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="p-url">포스팅 URL *</Label>
-            <Input id="p-url" value={url} onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://blog.naver.com/{블로거ID}/{포스트번호}" />
+            <div className="relative">
+              <Input id="p-url" value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onBlur={() => fetchMeta(url)}
+                placeholder="https://blog.naver.com/{블로거ID}/{포스트번호}" />
+              {fetchingMeta && (
+                <Loader2 className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {metaError && (
+              <p className="text-xs text-amber-600">메타 자동 추출 실패: {metaError}. 제목·발행일을 직접 입력하세요.</p>
+            )}
+            {title && (
+              <p className="text-xs text-muted-foreground truncate">
+                📝 자동 추출: <span className="text-foreground font-medium">{title}</span>
+              </p>
+            )}
           </div>
 
           {/* 블로거 자동/수동 매칭 */}
@@ -161,7 +223,7 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
             )}
           </div>
 
-          {/* 프로그램 + 제목 */}
+          {/* 프로그램 + 업로드 날짜 */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>프로그램</Label>
@@ -170,16 +232,16 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
                 <SelectTrigger><SelectValue placeholder="프로그램 선택" /></SelectTrigger>
                 <SelectContent className="bg-popover">
                   <SelectItem value="none">(미지정)</SelectItem>
-                  {PROGRAMS.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  {programs.map((p) => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="p-title">제목 (선택)</Label>
-              <Input id="p-title" value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder="포스팅 제목" />
+              <Label htmlFor="p-published">업로드 날짜</Label>
+              <Input id="p-published" type="date" value={publishedDate}
+                onChange={(e) => setPublishedDate(e.target.value)} />
             </div>
           </div>
 

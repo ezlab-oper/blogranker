@@ -1,9 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useKeywordCategories } from '@/hooks/useKeywords';
-
-const PROGRAMS = ['이지캡쳐', '이지집', '이지메모', '이지파인더', '이지캠', '이지리더'] as const;
-export { PROGRAMS };
+import { usePrograms } from '@/hooks/usePrograms';
 
 interface KeywordFilterBarProps {
   selectedPrograms: string[];
@@ -18,8 +16,9 @@ export function KeywordFilterBar({
   onProgramChange,
   onCategoryChange,
 }: KeywordFilterBarProps) {
-  // 카테고리는 DB(keyword_categories)와 동기화 — '카테고리 관리'에서 추가/삭제 시 자동 반영
+  // 카테고리는 DB(keyword_categories), 프로그램은 DB(programs)와 동기화.
   const { data: categories = [] } = useKeywordCategories();
+  const { data: programs = [] } = usePrograms();
 
   const toggleItem = (list: string[], item: string, setter: (v: string[]) => void) => {
     setter(list.includes(item) ? list.filter(i => i !== item) : [...list, item]);
@@ -31,17 +30,23 @@ export function KeywordFilterBar({
         {/* 프로그램 */}
         <div className="space-y-2 flex-1">
           <span className="text-sm font-semibold text-foreground">프로그램</span>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {PROGRAMS.map(prog => (
-              <Label key={prog} className="flex items-center gap-1.5 cursor-pointer text-sm font-normal">
-                <Checkbox
-                  checked={selectedPrograms.includes(prog)}
-                  onCheckedChange={() => toggleItem(selectedPrograms, prog, onProgramChange)}
-                />
-                {prog}
-              </Label>
-            ))}
-          </div>
+          {programs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              등록된 프로그램이 없습니다. (설정 → 프로그램 관리에서 등록)
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {programs.map(prog => (
+                <Label key={prog.id} className="flex items-center gap-1.5 cursor-pointer text-sm font-normal">
+                  <Checkbox
+                    checked={selectedPrograms.includes(prog.name)}
+                    onCheckedChange={() => toggleItem(selectedPrograms, prog.name, onProgramChange)}
+                  />
+                  {prog.name}
+                </Label>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 카테고리 (DB 동기화) */}

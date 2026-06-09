@@ -28,7 +28,7 @@ import { usePostings } from '@/hooks/usePostings';
 import { useKeywordSearchVolume } from '@/hooks/useKeywordSearchVolume';
 import { convertToCSV, downloadCSV } from '@/lib/utils/csv-export';
 import { useToast } from '@/hooks/use-toast';
-import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
+import { usePrograms } from '@/hooks/usePrograms';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -102,6 +102,7 @@ export function ResultsTable({
   const { data: bloggers = [] } = useBloggers();
   const { data: postings = [] } = usePostings();
   const { data: searchEngines } = useSearchEngines();
+  const { data: programs = [] } = usePrograms();
   const { getVolume } = useKeywordSearchVolume();
 
   // 매칭 빌더: postings(협업 포스팅) + bloggers(협업 블로거) 단일 소스
@@ -217,8 +218,8 @@ export function ResultsTable({
           </SelectTrigger>
           <SelectContent className="bg-popover">
             <SelectItem value="all">전체 프로그램</SelectItem>
-            {PROGRAMS.map((prog) => (
-              <SelectItem key={prog} value={prog}>{prog}</SelectItem>
+            {programs.map((prog) => (
+              <SelectItem key={prog.id} value={prog.name}>{prog.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>

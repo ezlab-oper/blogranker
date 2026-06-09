@@ -18,3 +18,7 @@ verify_jwt = false
 # 사용자 직접 호출(키워드 수집 페이지)은 user JWT를 함수 본문에서 supabase-js로 재검증.
 [functions.scrape-search]
 verify_jwt = false
+
+# 포스팅 URL에서 og:title/article:published_time 메타 추출. user JWT를 본문에서 재검증.
+[functions.fetch-post-meta]
+verify_jwt = false

@@ -253,6 +253,7 @@ export type Database = {
           id: string
           posting_url: string
           program: string | null
+          published_at: string | null
           target_keywords: string[] | null
           title: string | null
           updated_at: string
@@ -264,6 +265,7 @@ export type Database = {
           id?: string
           posting_url: string
           program?: string | null
+          published_at?: string | null
           target_keywords?: string[] | null
           title?: string | null
           updated_at?: string
@@ -275,6 +277,7 @@ export type Database = {
           id?: string
           posting_url?: string
           program?: string | null
+          published_at?: string | null
           target_keywords?: string[] | null
           title?: string | null
           updated_at?: string
@@ -316,18 +319,27 @@ export type Database = {
         }
         Relationships: []
       }
-      ranker: {
+      programs: {
         Row: {
           created_at: string
-          id: number
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
         }
         Insert: {
           created_at?: string
-          id?: number
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
         }
         Update: {
           created_at?: string
-          id?: number
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }

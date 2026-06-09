@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Calendar } from 'lucide-react';
+import { Clock, Bell, Shield, Loader2, Trash2, AlertTriangle, Calendar, Package } from 'lucide-react';
+import { ProgramManager } from '@/components/settings/ProgramManager';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -190,6 +191,22 @@ export default function Settings() {
               />
             </div>
             
+          </CardContent>
+        </Card>
+
+        {/* Program Management */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              프로그램 관리
+            </CardTitle>
+            <CardDescription>
+              키워드 관리·포스팅 추가 모달에서 선택 가능한 프로그램 목록을 관리합니다.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProgramManager />
           </CardContent>
         </Card>
 

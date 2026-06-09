@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBulkAddPostings, type PostingInput } from '@/hooks/usePostings';
 import { useBloggers } from '@/hooks/useBloggers';
 import { extractBlogId } from '@/hooks/useBlogUrls';
-import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
+import { usePrograms } from '@/hooks/usePrograms';
 
 // CSV 파서 (이중 따옴표·CRLF 처리)
 function parseCsv(text: string): string[][] {
@@ -34,13 +34,25 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-const HEADER_TEMPLATE = '포스팅URL,제목,프로그램,의뢰키워드';
+const HEADER_TEMPLATE = '포스팅URL,업로드날짜,프로그램,의뢰키워드';
+
+// 'YYYY-MM-DD' (또는 'YYYY/MM/DD', 'YYYY.MM.DD') → KST 자정 ISO. 빈 값은 null.
+function parsePublishedDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), -9, 0, 0)).toISOString();
+}
 
 export function PostingCsvUpload() {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const bulkAdd = useBulkAddPostings();
   const { data: bloggers = [] } = useBloggers();
+  const { data: programs = [] } = usePrograms();
+  const allowedProgramNames = programs.map((p) => p.name);
   const [parsing, setParsing] = useState(false);
 
   // blog_id → blogger.id 매칭용
@@ -58,7 +70,8 @@ export function PostingCsvUpload() {
       const idx = (k: string) => header.findIndex((h) => h === k);
       const iUrl = idx('포스팅URL');
       if (iUrl < 0) throw new Error(`헤더에 "포스팅URL"이 필수. 권장 헤더: ${HEADER_TEMPLATE}`);
-      const iTitle = idx('제목');
+      // 호환: 옛 '제목' 열은 무시(자동 추출로 대체).
+      const iPublished = idx('업로드날짜');
       const iProgram = idx('프로그램');
       const iKeywords = idx('의뢰키워드');
 
@@ -78,8 +91,8 @@ export function PostingCsvUpload() {
         }
 
         const programRaw = iProgram >= 0 ? (row[iProgram] || '').trim() : '';
-        if (programRaw && !(PROGRAMS as readonly string[]).includes(programRaw)) {
-          errors.push(`행 ${r + 1}: 프로그램 "${programRaw}" 허용 외. 허용: ${PROGRAMS.join('/')}`);
+        if (programRaw && !allowedProgramNames.includes(programRaw)) {
+          errors.push(`행 ${r + 1}: 프로그램 "${programRaw}" 허용 외. 허용: ${allowedProgramNames.join('/') || '(등록된 프로그램 없음)'}`);
           continue;
         }
 
@@ -95,13 +108,26 @@ export function PostingCsvUpload() {
         const blogId = extractBlogId(url);
         const bloggerId = blogId ? bloggerIdByBlogId.get(blogId) ?? null : null;
 
+        let publishedIso: string | null = null;
+        if (iPublished >= 0) {
+          const rawDate = (row[iPublished] || '').trim();
+          if (rawDate) {
+            publishedIso = parsePublishedDate(rawDate);
+            if (!publishedIso) {
+              errors.push(`행 ${r + 1}: 업로드날짜 형식 오류 "${rawDate}" (YYYY-MM-DD 권장)`);
+              continue;
+            }
+          }
+        }
+
         inputs.push({
           posting_url: url,
-          title: iTitle >= 0 ? (row[iTitle] || '').trim() || null : null,
+          title: null, // 제목은 자동 추출(추가 모달에서 fetch-post-meta)에 위임
           program: programRaw || null,
           target_keywords: target_keywords.length > 0 ? target_keywords : null,
           blogger_id: bloggerId,
           blog_id: blogId,
+          published_at: publishedIso,
         });
       }
 
@@ -136,7 +162,7 @@ export function PostingCsvUpload() {
 
   const downloadTemplate = () => {
     const csv = HEADER_TEMPLATE + '\n' +
-      'https://blog.naver.com/예시/123456789,예시 제목,이지캡쳐,화면캡쳐;윈도우 캡쳐\n';
+      'https://blog.naver.com/예시/123456789,2026-06-04,이지캡쳐,화면캡쳐;윈도우 캡쳐\n';
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

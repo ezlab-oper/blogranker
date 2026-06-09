@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { PROGRAMS } from '@/components/keywords/KeywordFilterBar';
+import { usePrograms } from '@/hooks/usePrograms';
 import {
   Dialog,
   DialogContent,
@@ -139,6 +139,7 @@ function CategoryManager() {
 
 export function KeywordDialog({ open, onOpenChange, editData }: KeywordDialogProps) {
   const { data: categories } = useKeywordCategories();
+  const { data: programs = [] } = usePrograms();
   const createKeyword = useCreateKeyword();
   const updateKeyword = useUpdateKeyword();
 
@@ -217,8 +218,8 @@ export function KeywordDialog({ open, onOpenChange, editData }: KeywordDialogPro
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="none">프로그램 없음</SelectItem>
-                          {PROGRAMS.map((prog) => (
-                            <SelectItem key={prog} value={prog}>{prog}</SelectItem>
+                          {programs.map((prog) => (
+                            <SelectItem key={prog.id} value={prog.name}>{prog.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
