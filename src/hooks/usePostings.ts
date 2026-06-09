@@ -31,10 +31,13 @@ export function usePostings() {
   return useQuery({
     queryKey: ['postings'],
     queryFn: async (): Promise<Posting[]> => {
+      // 업로드 날짜(published_at) 우선 정렬, null은 뒤로. 동률은 등록일 보조.
       const { data, error } = await supabase
         .from('postings')
         .select('*, blogger:bloggers(*)')
-        .order('created_at', { ascending: false });
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(50000);
       if (error) throw error;
       return (data as Posting[]) || [];
     },
@@ -79,8 +82,8 @@ export function useUpdatePosting() {
   });
 }
 
-// CSV 등 다건 등록. blog_id는 URL에서 자동 추출.
-// 매칭된 블로거 ID를 외부에서 주입 가능 (bloggers를 매번 다시 조회 안 해도 됨).
+// CSV 등 다건 등록·갱신. blog_id는 URL에서 자동 추출.
+// posting_url을 키로 upsert: 같은 URL이 DB에 있으면 새 값으로 덮어쓴다.
 export function useBulkAddPostings() {
   const qc = useQueryClient();
   return useMutation({
@@ -90,7 +93,10 @@ export function useBulkAddPostings() {
         ...r,
         blog_id: r.blog_id ?? extractBlogId(r.posting_url),
       }));
-      const { data, error } = await supabase.from('postings').insert(normalized).select();
+      const { data, error } = await supabase
+        .from('postings')
+        .upsert(normalized, { onConflict: 'posting_url' })
+        .select();
       if (error) throw error;
       return (data as Posting[]) || [];
     },

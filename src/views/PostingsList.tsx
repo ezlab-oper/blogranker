@@ -117,7 +117,7 @@ export default function PostingsList() {
                   <TableHead>포스팅 URL</TableHead>
                   <TableHead>제목</TableHead>
                   <TableHead className="w-28 text-center">순위 추이</TableHead>
-                  <TableHead className="w-36">등록일</TableHead>
+                  <TableHead className="w-36">업로드 날짜</TableHead>
                   {canPerformActions && <TableHead className="text-right w-28">작업</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -143,7 +143,9 @@ export default function PostingsList() {
                       </Button>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(p.created_at).toLocaleDateString('ko-KR')}
+                      {p.published_at
+                        ? new Date(p.published_at).toLocaleDateString('ko-KR')
+                        : <span className="opacity-60">-</span>}
                     </TableCell>
                     {canPerformActions && (
                       <TableCell className="text-right">

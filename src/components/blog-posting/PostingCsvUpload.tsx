@@ -8,6 +8,20 @@ import { useBulkAddPostings, type PostingInput } from '@/hooks/usePostings';
 import { useBloggers } from '@/hooks/useBloggers';
 import { extractBlogId } from '@/hooks/useBlogUrls';
 import { usePrograms } from '@/hooks/usePrograms';
+import { supabase } from '@/integrations/supabase/client';
+
+// fetch-post-meta 일괄 호출용. 한 번에 N개 chunk 병렬, 실패 시 null.
+const FETCH_CHUNK = 8;
+
+async function fetchMetaSafe(url: string): Promise<{ title: string | null; published_at: string | null }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('fetch-post-meta', { body: { url } });
+    if (error || !data?.success) return { title: null, published_at: null };
+    return { title: data.title ?? null, published_at: data.published_at ?? null };
+  } catch {
+    return { title: null, published_at: null };
+  }
+}
 
 // CSV 파서 (이중 따옴표·CRLF 처리)
 function parseCsv(text: string): string[][] {
@@ -54,6 +68,7 @@ export function PostingCsvUpload() {
   const { data: programs = [] } = usePrograms();
   const allowedProgramNames = programs.map((p) => p.name);
   const [parsing, setParsing] = useState(false);
+  const [metaProgress, setMetaProgress] = useState<{ done: number; total: number } | null>(null);
 
   // blog_id → blogger.id 매칭용
   const bloggerIdByBlogId = new Map<string, string>();
@@ -159,22 +174,43 @@ export function PostingCsvUpload() {
       }
       if (deduped.length === 0) return;
 
+      // fetch-post-meta로 제목·발행일 일괄 자동 추출.
+      // - 제목은 항상 fetch 결과로 덮음(CSV에 제목 컬럼 없음).
+      // - 발행일은 CSV 값 우선(있으면 그대로), 없을 때만 fetch 결과 사용.
+      setMetaProgress({ done: 0, total: deduped.length });
+      let titleHits = 0;
+      let publishedHits = 0;
+      for (let i = 0; i < deduped.length; i += FETCH_CHUNK) {
+        const slice = deduped.slice(i, i + FETCH_CHUNK);
+        const metas = await Promise.all(slice.map((d) => fetchMetaSafe(d.posting_url)));
+        metas.forEach((meta, j) => {
+          const target = deduped[i + j];
+          if (meta.title) {
+            target.title = meta.title;
+            titleHits++;
+          }
+          if (!target.published_at && meta.published_at) {
+            target.published_at = meta.published_at;
+            publishedHits++;
+          }
+        });
+        setMetaProgress({ done: Math.min(i + FETCH_CHUNK, deduped.length), total: deduped.length });
+      }
+      setMetaProgress(null);
+
       const result = await bulkAdd.mutateAsync(deduped);
       const matched = deduped.filter((i) => i.blogger_id).length;
       const unmatched = deduped.length - matched;
       toast({
         title: 'CSV 업로드 완료',
-        description: `${result.length}건 등록 (블로거 매칭 ${matched}건, 미매칭 ${unmatched}건${droppedDupCount > 0 ? `, 중복 ${droppedDupCount}건 제외` : ''}).`,
+        description: `${result.length}건 등록·갱신 (블로거 매칭 ${matched}/미매칭 ${unmatched}, 제목 자동 추출 ${titleHits}/발행일 자동 보강 ${publishedHits}${droppedDupCount > 0 ? `, 중복 ${droppedDupCount}건 제외` : ''}). 같은 URL이 DB에 있었다면 새 값으로 덮어썼습니다.`,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : '알 수 없는 오류';
-      // UNIQUE(posting_url) 위반 시 친절한 메시지
-      const friendly = msg.includes('duplicate') || msg.includes('unique')
-        ? 'CSV에 이미 등록된 URL이 포함돼 있어 일괄 삽입이 실패했습니다. 중복 URL 제거 후 재시도하세요.'
-        : msg;
-      toast({ title: 'CSV 업로드 실패', description: friendly, variant: 'destructive' });
+      toast({ title: 'CSV 업로드 실패', description: msg, variant: 'destructive' });
     } finally {
       setParsing(false);
+      setMetaProgress(null);
       if (inputRef.current) inputRef.current.value = '';
     }
   };
@@ -195,9 +231,11 @@ export function PostingCsvUpload() {
       <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden"
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
       <Button variant="outline" onClick={() => inputRef.current?.click()}
-        disabled={parsing || bulkAdd.isPending} className="gap-2">
-        {(parsing || bulkAdd.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-        CSV 업로드
+        disabled={parsing || bulkAdd.isPending || !!metaProgress} className="gap-2">
+        {(parsing || bulkAdd.isPending || metaProgress) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+        {metaProgress
+          ? `메타 추출 ${metaProgress.done}/${metaProgress.total}`
+          : 'CSV 업로드'}
       </Button>
       <Button variant="ghost" size="sm" onClick={downloadTemplate} className="text-xs gap-1">
         <AlertCircle className="w-3 h-3" />
