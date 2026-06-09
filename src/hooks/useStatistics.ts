@@ -135,7 +135,7 @@ export function useStatistics(dateRange?: DateRange) {
   const platformStatsQuery = useQuery({
     queryKey: ['statistics', 'platforms', fromDate, toDate],
     queryFn: async (): Promise<PlatformStats[]> => {
-      let query = supabase.from('crawl_results').select('blog_platform');
+      let query = supabase.from('crawl_results').select('blog_platform').limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);
@@ -164,7 +164,7 @@ export function useStatistics(dateRange?: DateRange) {
   const dailyStatsQuery = useQuery({
     queryKey: ['statistics', 'daily', fromDate, toDate],
     queryFn: async (): Promise<DailyStats[]> => {
-      let query = supabase.from('crawl_results').select('crawled_at, search_engine_id');
+      let query = supabase.from('crawl_results').select('crawled_at, search_engine_id').limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);
@@ -178,8 +178,15 @@ export function useStatistics(dateRange?: DateRange) {
 
       if (!results || !engines) return [];
 
-      const naverEngineId = engines.find(e => e.name.toLowerCase() === 'naver')?.id;
-      const googleEngineId = engines.find(e => e.name.toLowerCase() === 'google')?.id;
+      // DB 엔진 이름은 한글 '네이버'/'구글'. 영문도 보조로 허용.
+      const matchEngine = (name: string, target: 'naver' | 'google') => {
+        const lower = name.toLowerCase();
+        return target === 'naver'
+          ? (name === '네이버' || lower.includes('naver'))
+          : (name === '구글' || lower.includes('google'));
+      };
+      const naverEngineId = engines.find(e => matchEngine(e.name, 'naver'))?.id;
+      const googleEngineId = engines.find(e => matchEngine(e.name, 'google'))?.id;
 
       const dailyCounts: Record<string, { naver: number; google: number }> = {};
 
@@ -210,7 +217,7 @@ export function useStatistics(dateRange?: DateRange) {
   const rankDistributionQuery = useQuery({
     queryKey: ['statistics', 'rankDistribution', fromDate, toDate],
     queryFn: async (): Promise<RankDistribution[]> => {
-      let query = supabase.from('crawl_results').select('rank');
+      let query = supabase.from('crawl_results').select('rank').limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);
@@ -240,7 +247,7 @@ export function useStatistics(dateRange?: DateRange) {
   const jobStatsQuery = useQuery({
     queryKey: ['statistics', 'jobs', fromDate, toDate],
     queryFn: async (): Promise<JobStats> => {
-      let query = supabase.from('crawl_jobs').select('status, successful_keywords, failed_keywords, created_at');
+      let query = supabase.from('crawl_jobs').select('status, successful_keywords, failed_keywords, created_at').limit(50000);
 
       if (fromDate) {
         query = query.gte('created_at', fromDate);

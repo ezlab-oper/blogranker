@@ -131,6 +131,19 @@ export function PostingCsvUpload() {
         });
       }
 
+      // CSV 내부 중복 URL 제거 — 첫 번째 행만 유지, 이후는 무시.
+      const seenUrls = new Set<string>();
+      const deduped: PostingInput[] = [];
+      let droppedDupCount = 0;
+      for (const inp of inputs) {
+        if (seenUrls.has(inp.posting_url)) {
+          droppedDupCount++;
+          continue;
+        }
+        seenUrls.add(inp.posting_url);
+        deduped.push(inp);
+      }
+
       if (errors.length > 0) {
         toast({
           title: '일부 행 오류',
@@ -138,14 +151,20 @@ export function PostingCsvUpload() {
           variant: 'destructive',
         });
       }
-      if (inputs.length === 0) return;
+      if (droppedDupCount > 0) {
+        toast({
+          title: '중복 URL 제외',
+          description: `CSV 내부에서 중복된 URL ${droppedDupCount}건은 첫 번째 행만 유지하고 이후 행은 무시했습니다.`,
+        });
+      }
+      if (deduped.length === 0) return;
 
-      const result = await bulkAdd.mutateAsync(inputs);
-      const matched = inputs.filter((i) => i.blogger_id).length;
-      const unmatched = inputs.length - matched;
+      const result = await bulkAdd.mutateAsync(deduped);
+      const matched = deduped.filter((i) => i.blogger_id).length;
+      const unmatched = deduped.length - matched;
       toast({
         title: 'CSV 업로드 완료',
-        description: `${result.length}건 등록 (블로거 매칭 ${matched}건, 미매칭 ${unmatched}건).`,
+        description: `${result.length}건 등록 (블로거 매칭 ${matched}건, 미매칭 ${unmatched}건${droppedDupCount > 0 ? `, 중복 ${droppedDupCount}건 제외` : ''}).`,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : '알 수 없는 오류';
