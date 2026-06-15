@@ -23,6 +23,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial?: Blogger | null; // 있으면 수정 모드
+  // 추가 모드에서 폼에 미리 채워둘 값 (initial이 있으면 무시됨).
+  // 외부 블로거를 협업으로 등록할 때 name·blog_url·blog_id·status 등을 자동 채우는 용도.
+  prefill?: Partial<BloggerInput> | null;
   onSubmit: (input: BloggerInput) => Promise<void> | void;
   isPending?: boolean;
 }
@@ -41,7 +44,7 @@ const empty: BloggerInput = {
 
 const CONTINUOUS_DATE = '2999-12-31'; // '계속' 센티넬
 
-export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending }: Props) {
+export function BloggerDialog({ open, onOpenChange, initial, prefill, onSubmit, isPending }: Props) {
   const [form, setForm] = useState<BloggerInput>(empty);
   const [memoOpen, setMemoOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
@@ -61,10 +64,10 @@ export function BloggerDialog({ open, onOpenChange, initial, onSubmit, isPending
               is_influencer: initial.is_influencer,
               memo: initial.memo || '',
             }
-          : empty
+          : { ...empty, ...(prefill ?? {}) }
       );
     }
-  }, [open, initial]);
+  }, [open, initial, prefill]);
 
   // 단가 표시용 포맷팅 — 입력 시 숫자만 받아 천 단위 콤마 + "원"
   const priceDisplay =

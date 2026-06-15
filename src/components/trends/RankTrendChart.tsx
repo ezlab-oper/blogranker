@@ -77,11 +77,14 @@ export function RankTrendChart() {
   const { data: engines } = useSearchEngines();
   const { data: bloggers = [] } = useBloggers();
 
-  // 우리 측 blog_id 집합: 공식블로그 + 협업 블로거
+  // 우리 측 blog_id 집합: 공식블로그 + 협업 블로거(= status='계약됨'만).
+  // 협업 요청·거절·만료 블로거는 외부로 간주.
   const ourBlogIds = useMemo(() => {
     const s = new Set<string>();
     s.add(OFFICIAL_BLOG_ID);
-    bloggers.forEach((b) => b.blog_id && s.add(b.blog_id));
+    bloggers.forEach((b) => {
+      if (b.blog_id && b.status === '계약됨') s.add(b.blog_id);
+    });
     return s;
   }, [bloggers]);
 

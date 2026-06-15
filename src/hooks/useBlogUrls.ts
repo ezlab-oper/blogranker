@@ -8,12 +8,13 @@ import type { Blogger } from './useBloggers';
 export const OFFICIAL_BLOG_ID = 'ezlab_official';
 export const OFFICIAL_BLOG_URL = 'https://blog.naver.com/ezlab_official';
 
-export type MatchType = 'official_blog' | 'exact_url' | 'same_blog_id' | 'none';
+export type MatchType = 'official_blog' | 'exact_url' | 'same_blog_id' | 'expired_blogger' | 'none';
 // 라벨:
-//   official_blog : 공식블로그 (ezlab_official)
-//   exact_url     : 협업 포스팅 (postings 테이블에 등록된 URL — 우리가 의뢰한 그 글)
-//   same_blog_id  : 협업 블로거 (블로거는 등록됐지만 그 글은 postings에 미등록 = 다른 글)
-//   none          : 일반
+//   official_blog   : 공식블로그 (ezlab_official)
+//   exact_url       : 협업 포스팅 (postings 테이블에 등록된 URL — 우리가 의뢰한 그 글)
+//   same_blog_id    : 협업 블로거 (status='계약됨' 블로거의 다른 글)
+//   expired_blogger : 계약만료 블로거 (과거 협업했던 블로거)
+//   none            : 일반
 
 // URL에서 블로거 ID 추출
 export function extractBlogId(url: string): string | null {
@@ -52,8 +53,10 @@ export function normalizeUrl(url: string): string {
 export interface Matchers {
   // 협업 포스팅 URL 집합 (postings 테이블 기반, 정규화 포함)
   postingUrlSet: Set<string>;
-  // 협업 블로거의 blog_id 집합
+  // 협업 블로거(=계약됨)의 blog_id 집합
   bloggerBlogIds: Set<string>;
+  // 계약만료 블로거의 blog_id 집합 (별도 표시용)
+  expiredBloggerIds: Set<string>;
 }
 
 export function buildMatchers(postings: Posting[], bloggers: Blogger[]): Matchers {
@@ -63,28 +66,28 @@ export function buildMatchers(postings: Posting[], bloggers: Blogger[]): Matcher
     postingUrlSet.add(normalizeUrl(p.posting_url));
   }
   const bloggerBlogIds = new Set<string>();
+  const expiredBloggerIds = new Set<string>();
   for (const b of bloggers) {
-    if (b.blog_id) bloggerBlogIds.add(b.blog_id);
+    if (!b.blog_id) continue;
+    if (b.status === '계약됨') bloggerBlogIds.add(b.blog_id);
+    else if (b.status === '계약만료') expiredBloggerIds.add(b.blog_id);
   }
-  return { postingUrlSet, bloggerBlogIds };
+  return { postingUrlSet, bloggerBlogIds, expiredBloggerIds };
 }
 
-// 결과 URL의 매칭 등급 판정. program 인자는 더 이상 사용 안 함(시트 동기화 시절의 제약).
+// 결과 URL의 매칭 등급 판정. 우선순위:
+// official_blog > exact_url > same_blog_id(계약됨) > expired_blogger(계약만료) > none.
 export function getMatchType(resultUrl: string, matchers: Matchers): MatchType {
   const blogId = extractBlogId(resultUrl);
 
-  // 공식블로그 최우선
   if (blogId === OFFICIAL_BLOG_ID) return 'official_blog';
 
-  // 협업 포스팅: 정확 URL 일치 (정규화 포함)
   if (matchers.postingUrlSet.has(resultUrl) || matchers.postingUrlSet.has(normalizeUrl(resultUrl))) {
     return 'exact_url';
   }
 
-  // 협업 블로거: 같은 블로거의 다른 글
-  if (blogId && matchers.bloggerBlogIds.has(blogId)) {
-    return 'same_blog_id';
-  }
+  if (blogId && matchers.bloggerBlogIds.has(blogId)) return 'same_blog_id';
+  if (blogId && matchers.expiredBloggerIds.has(blogId)) return 'expired_blogger';
 
   return 'none';
 }

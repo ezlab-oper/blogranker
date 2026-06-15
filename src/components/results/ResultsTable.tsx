@@ -99,11 +99,14 @@ export function ResultsTable({
     crawl_date: selectedDate || undefined,
   });
   const { data: allKeywords } = useKeywords();
+  // buildMatchers가 status 기준으로 계약됨/계약만료를 내부에서 분리한다.
   const { data: bloggers = [] } = useBloggers();
   const { data: postings = [] } = usePostings();
   const { data: searchEngines } = useSearchEngines();
   const { data: programs = [] } = usePrograms();
-  const { getVolume } = useKeywordSearchVolume();
+  // 키워드 전체를 넘겨서 Keywords 페이지와 같은 캐시 공유 (검색량 PC/모바일 컬럼 채움).
+  const keywordStrings = useMemo(() => (allKeywords ?? []).map((k) => k.keyword), [allKeywords]);
+  const { getVolume } = useKeywordSearchVolume(keywordStrings);
 
   // 매칭 빌더: postings(협업 포스팅) + bloggers(협업 블로거) 단일 소스
   const matchers = useMemo(() => buildMatchers(postings, bloggers), [postings, bloggers]);
@@ -323,7 +326,11 @@ export function ResultsTable({
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-sky-500/20 border border-sky-500/30" />
-          협업 블로거 (블로그 ID 일치)
+          협업 블로거 (계약됨)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-red-500/20 border border-red-500/30" />
+          계약만료 블로거
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-muted border" />
@@ -382,6 +389,8 @@ export function ResultsTable({
                   ? 'bg-violet-500/10 hover:bg-violet-500/15'
                   : matchType === 'exact_url'
                   ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
+                  : matchType === 'expired_blogger'
+                  ? 'bg-red-500/10 hover:bg-red-500/15'
                   : '';
 
                 const volume = result.keyword?.keyword ? getVolume(result.keyword.keyword) : undefined;
@@ -437,11 +446,15 @@ export function ResultsTable({
                             <span className={cn(
                               "flex items-center gap-1",
                               matchType === 'same_blog_id' && "px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-700 dark:text-sky-300 font-medium",
+                              matchType === 'expired_blogger' && "px-1.5 py-0.5 rounded bg-red-500/20 text-red-700 dark:text-red-300 font-medium",
                             )}>
                               <User className="w-3 h-3" />
                               {result.blog_author}
                               {matchType === 'same_blog_id' && (
                                 <span className="text-[10px] ml-1">협업 블로거</span>
+                              )}
+                              {matchType === 'expired_blogger' && (
+                                <span className="text-[10px] ml-1">계약만료</span>
                               )}
                             </span>
                           )}

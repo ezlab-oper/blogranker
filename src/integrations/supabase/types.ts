@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       bloggers: {
@@ -394,6 +419,57 @@ export type Database = {
         }
         Relationships: []
       }
+      top_external_bloggers: {
+        Row: {
+          author_name: string | null
+          avg_rank: number
+          best_rank: number
+          blog_id: string
+          computed_at: string
+          engines: string[]
+          hit_keyword_count: number
+          hit_keywords: string[]
+          last_seen_at: string
+          period_days: number
+          platform: string | null
+          program: string
+          sample_post_url: string | null
+          total_appearances: number
+        }
+        Insert: {
+          author_name?: string | null
+          avg_rank: number
+          best_rank: number
+          blog_id: string
+          computed_at?: string
+          engines?: string[]
+          hit_keyword_count?: number
+          hit_keywords?: string[]
+          last_seen_at: string
+          period_days: number
+          platform?: string | null
+          program?: string
+          sample_post_url?: string | null
+          total_appearances?: number
+        }
+        Update: {
+          author_name?: string | null
+          avg_rank?: number
+          best_rank?: number
+          blog_id?: string
+          computed_at?: string
+          engines?: string[]
+          hit_keyword_count?: number
+          hit_keywords?: string[]
+          last_seen_at?: string
+          period_days?: number
+          platform?: string | null
+          program?: string
+          sample_post_url?: string | null
+          total_appearances?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -423,6 +499,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      detect_blog_platform: { Args: { url: string }; Returns: string }
+      extract_blog_id_from_url: { Args: { url: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -436,6 +514,13 @@ export type Database = {
       }
       is_editor: { Args: { _uid: string }; Returns: boolean }
       is_master: { Args: { _uid: string }; Returns: boolean }
+      refresh_top_external_bloggers: {
+        Args: never
+        Returns: {
+          period_days: number
+          rows_inserted: number
+        }[]
+      }
       schedule_cron_job: {
         Args: {
           auth_token: string
@@ -462,7 +547,7 @@ export type Database = {
         | "준최적1"
         | "일반"
         | "저품질"
-      blogger_status: "협의중" | "회신대기" | "계약중" | "계약만료"
+      blogger_status: "협업 요청" | "협업 거절" | "계약됨" | "계약만료"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -588,6 +673,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["master", "admin", "viewer"],
@@ -604,7 +692,7 @@ export const Constants = {
         "일반",
         "저품질",
       ],
-      blogger_status: ["협의중", "회신대기", "계약중", "계약만료"],
+      blogger_status: ["협업 요청", "협업 거절", "계약됨", "계약만료"],
     },
   },
 } as const

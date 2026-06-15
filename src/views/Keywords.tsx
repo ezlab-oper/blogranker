@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, BarChart3, Loader2, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -19,7 +19,10 @@ import type { Keyword, KeywordCategory } from '@/types/database';
 export default function Keywords() {
   const { canPerformActions } = useAuth();
   const { data: keywords } = useKeywords();
-  const { data: searchVolumeData, isLoading: isLoadingVolume, fetchedAt, fetchSearchVolume } = useKeywordSearchVolume();
+  // keywords를 그대로 넘기면 React Query가 자동 조회 + 캐시 공유 (Results 페이지와도 공유).
+  const keywordStrings = useMemo(() => (keywords ?? []).map((kw) => kw.keyword), [keywords]);
+  const { data: searchVolumeData, isLoading: isLoadingVolume, fetchedAt, fetchSearchVolume } =
+    useKeywordSearchVolume(keywordStrings);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editData, setEditData] = useState<(Keyword & { category: KeywordCategory | null }) | null>(null);
@@ -27,14 +30,6 @@ export default function Keywords() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [bulkConfirm, setBulkConfirm] = useState<null | { is_active: boolean }>(null);
   const bulkSetActive = useBulkSetKeywordsActive();
-
-  // 페이지 로드 시 검색량 자동 조회
-  useEffect(() => {
-    if (keywords && keywords.length > 0 && !fetchedAt && !isLoadingVolume) {
-      const keywordStrings = keywords.map(kw => kw.keyword);
-      fetchSearchVolume(keywordStrings);
-    }
-  }, [keywords]);
 
   const handleEdit = (keyword: Keyword & { category: KeywordCategory | null }) => {
     setEditData(keyword);

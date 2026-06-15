@@ -19,6 +19,7 @@ import {
   BookOpen,
   PenSquare,
   UsersRound,
+  Star,
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,7 +41,18 @@ type NavItem = {
 const allNavItems: NavItem[] = [
   { icon: LayoutDashboard, label: '대시보드', path: '/', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   { icon: Tags, label: '키워드 관리', path: '/keywords', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
-  { icon: FileText, label: '키워드 수집', path: '/results', requireFeatures: true, requireSettings: false, requireAdminManagement: false },
+  {
+    icon: FileText,
+    label: '키워드 수집',
+    path: '/results',
+    requireFeatures: true,
+    requireSettings: false,
+    requireAdminManagement: false,
+    children: [
+      { icon: FileText, label: '수집 결과', path: '/results' },
+      { icon: Star, label: '상위노출 블로거', path: '/results/top-bloggers' },
+    ],
+  },
   { icon: TrendingUp, label: '순위 추이', path: '/trends', requireFeatures: false, requireSettings: false, requireAdminManagement: false },
   {
     icon: BookOpen,

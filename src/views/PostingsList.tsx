@@ -18,6 +18,25 @@ import { useToast } from '@/hooks/use-toast';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+const DATE_RANGE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: '전체 기간' },
+  { value: '7', label: '최근 7일' },
+  { value: '30', label: '최근 30일' },
+  { value: '90', label: '최근 90일' },
+  { value: '365', label: '최근 1년' },
+];
+
+// KST 기준 N일 전 자정 ISO. 'all'이면 null.
+function cutoffFromRange(range: string): string | null {
+  if (range === 'all') return null;
+  const days = parseInt(range);
+  if (!Number.isFinite(days)) return null;
+  const nowKstMs = Date.now() + 9 * 60 * 60 * 1000;
+  const todayKstStart = Math.floor(nowKstMs / 86400000) * 86400000;
+  const cutoffKst = todayKstStart - (days - 1) * 86400000;
+  return new Date(cutoffKst - 9 * 60 * 60 * 1000).toISOString();
+}
+
 export default function PostingsList() {
   const { canPerformActions } = useAuth();
   const { toast } = useToast();
@@ -33,11 +52,19 @@ export default function PostingsList() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [dateRange, setDateRange] = useState<string>('all');
 
-  const total = postings.length;
+  // 기간 필터: published_at 기준. 'all'은 null 포함 전체, N일은 published_at >= cutoff.
+  const filtered = useMemo(() => {
+    const cutoff = cutoffFromRange(dateRange);
+    if (!cutoff) return postings;
+    return postings.filter((p) => p.published_at && p.published_at >= cutoff);
+  }, [postings, dateRange]);
+
+  const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = (page - 1) * pageSize;
-  const items = useMemo(() => postings.slice(start, start + pageSize), [postings, start, pageSize]);
+  const items = useMemo(() => filtered.slice(start, start + pageSize), [filtered, start, pageSize]);
 
   const handleSubmit = async (input: Parameters<typeof addPosting.mutateAsync>[0]) => {
     try {
@@ -89,9 +116,29 @@ export default function PostingsList() {
           )}
         </motion.div>
 
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 p-4 bg-card rounded-xl border shadow-card">
+          <Select
+            value={dateRange}
+            onValueChange={(v) => { setDateRange(v); setPage(1); }}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="기간" /></SelectTrigger>
+            <SelectContent className="bg-popover">
+              {DATE_RANGE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {dateRange !== 'all' && (
+            <Button variant="outline" onClick={() => { setDateRange('all'); setPage(1); }}>
+              초기화
+            </Button>
+          )}
+        </div>
+
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             총 <span className="font-semibold text-foreground">{total}</span>건
+            {dateRange !== 'all' && (
+              <span className="ml-2 text-xs">(기간 필터, 전체 {postings.length}건 중)</span>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">페이지당</span>

@@ -26,6 +26,25 @@ import { cn } from '@/lib/utils';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+const DATE_RANGE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: '전체 기간' },
+  { value: '7', label: '최근 7일' },
+  { value: '30', label: '최근 30일' },
+  { value: '90', label: '최근 90일' },
+  { value: '365', label: '최근 1년' },
+];
+
+// KST 기준 N일 전 자정 ISO. 'all'이면 null.
+function cutoffFromRange(range: string): string | null {
+  if (range === 'all') return null;
+  const days = parseInt(range);
+  if (!Number.isFinite(days)) return null;
+  const nowKstMs = Date.now() + 9 * 60 * 60 * 1000;
+  const todayKstStart = Math.floor(nowKstMs / 86400000) * 86400000;
+  const cutoffKst = todayKstStart - (days - 1) * 86400000;
+  return new Date(cutoffKst - 9 * 60 * 60 * 1000).toISOString();
+}
+
 // 오늘 날짜(YYYY-MM-DD)
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -52,6 +71,7 @@ export default function BloggersList() {
   const [pageSize, setPageSize] = useState(20);
   const [statusFilter, setStatusFilter] = useState<BloggerStatus | ''>('');
   const [infFilter, setInfFilter] = useState<'all' | 'yes' | 'no'>('all');
+  const [dateRange, setDateRange] = useState<string>('all');
 
   // 계약만료일이 지났는데 status가 '계약만료'가 아닌 행 → DB에 일괄 반영 (editor 권한 보유 시)
   useEffect(() => {
@@ -70,15 +90,17 @@ export default function BloggersList() {
     })();
   }, [bloggers, canPerformActions, queryClient]);
 
-  // 필터 적용
+  // 필터 적용 (상태·인플·등록일 기간)
   const filtered = useMemo(() => {
+    const cutoff = cutoffFromRange(dateRange);
     return bloggers.filter((b) => {
       if (statusFilter && effectiveStatus(b) !== statusFilter) return false;
       if (infFilter === 'yes' && !b.is_influencer) return false;
       if (infFilter === 'no' && b.is_influencer) return false;
+      if (cutoff && b.created_at < cutoff) return false;
       return true;
     });
-  }, [bloggers, statusFilter, infFilter]);
+  }, [bloggers, statusFilter, infFilter, dateRange]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -153,8 +175,16 @@ export default function BloggersList() {
               <SelectItem value="no">무</SelectItem>
             </SelectContent>
           </Select>
+          <Select
+            value={dateRange}
+            onValueChange={(v) => { setDateRange(v); setPage(1); }}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="등록일 기간" /></SelectTrigger>
+            <SelectContent className="bg-popover">
+              {DATE_RANGE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Button variant="outline"
-            onClick={() => { setStatusFilter(''); setInfFilter('all'); setPage(1); }}>
+            onClick={() => { setStatusFilter(''); setInfFilter('all'); setDateRange('all'); setPage(1); }}>
             초기화
           </Button>
         </div>
@@ -163,7 +193,7 @@ export default function BloggersList() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             총 <span className="font-semibold text-foreground">{total}</span>명
-            {(statusFilter || infFilter !== 'all') && (
+            {(statusFilter || infFilter !== 'all' || dateRange !== 'all') && (
               <span className="ml-2 text-xs">(필터 적용됨, 전체 {bloggers.length}명 중)</span>
             )}
           </p>
