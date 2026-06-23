@@ -85,17 +85,27 @@ export function parseGoogleResults(_markdown: string, rawHtml: string): BlogResu
     const url = resolveGoogleHref(raw);
     if (!isValidBlogPostUrl(url)) continue;
     if (isInExcludedSection(a)) continue;
-    if (addedUrls.has(url)) continue;
 
-    // 제목: anchor 내부 h3 우선, 없으면 anchor 텍스트
-    const h3 = a.querySelector('h3');
+    // 제목 후보: anchor 내부 h3 → anchor 텍스트 → 부모 컨테이너 안 h3 (썸네일 anchor 대응)
+    const h3 = a.querySelector('h3')
+      || a.parentElement?.querySelector('h3')
+      || a.parentElement?.parentElement?.querySelector('h3');
     const text = (h3?.textContent ?? a.textContent ?? '').toString();
-    const title = cleanTitle(text) ?? DEFAULT_TITLE;
+    const nodeTitle = cleanTitle(text);
+
+    if (addedUrls.has(url)) {
+      // 이미 등록된 URL이 DEFAULT_TITLE이면 더 나은 텍스트로 교체.
+      if (nodeTitle) {
+        const existing = results.find((r) => r.url === url);
+        if (existing && existing.title === DEFAULT_TITLE) existing.title = nodeTitle;
+      }
+      continue;
+    }
 
     addedUrls.add(url);
     results.push({
       rank: results.length + 1,
-      title,
+      title: nodeTitle ?? DEFAULT_TITLE,
       author: extractAuthorFromUrl(url),
       url,
       snippet: null,
