@@ -30,12 +30,14 @@ export interface Blogger {
   blog_grade: BlogGrade | null;
   is_influencer: boolean;
   memo: string | null;
+  requested_at: string | null; // 협업 요청 메일을 보낸 시각
   created_at: string;
   updated_at: string;
 }
 
-export type BloggerInput = Omit<Blogger, 'id' | 'created_at' | 'updated_at' | 'blog_id'> & {
+export type BloggerInput = Omit<Blogger, 'id' | 'created_at' | 'updated_at' | 'blog_id' | 'requested_at'> & {
   blog_id?: string | null;
+  requested_at?: string | null;
 };
 
 export function useBloggers() {

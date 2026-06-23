@@ -51,6 +51,7 @@ export type Database = {
           is_influencer: boolean | null
           memo: string | null
           name: string
+          requested_at: string | null
           status: Database["public"]["Enums"]["blogger_status"] | null
           unit_price: number | null
           updated_at: string
@@ -66,6 +67,7 @@ export type Database = {
           is_influencer?: boolean | null
           memo?: string | null
           name: string
+          requested_at?: string | null
           status?: Database["public"]["Enums"]["blogger_status"] | null
           unit_price?: number | null
           updated_at?: string
@@ -81,6 +83,7 @@ export type Database = {
           is_influencer?: boolean | null
           memo?: string | null
           name?: string
+          requested_at?: string | null
           status?: Database["public"]["Enums"]["blogger_status"] | null
           unit_price?: number | null
           updated_at?: string
@@ -281,6 +284,7 @@ export type Database = {
           published_at: string | null
           target_keywords: string[] | null
           title: string | null
+          unit_price: number | null
           updated_at: string
         }
         Insert: {
@@ -293,6 +297,7 @@ export type Database = {
           published_at?: string | null
           target_keywords?: string[] | null
           title?: string | null
+          unit_price?: number | null
           updated_at?: string
         }
         Update: {
@@ -305,6 +310,7 @@ export type Database = {
           published_at?: string | null
           target_keywords?: string[] | null
           title?: string | null
+          unit_price?: number | null
           updated_at?: string
         }
         Relationships: [

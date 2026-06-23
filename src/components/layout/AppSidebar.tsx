@@ -20,6 +20,7 @@ import {
   PenSquare,
   UsersRound,
   Star,
+  Mail,
   LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -64,6 +65,7 @@ const allNavItems: NavItem[] = [
     children: [
       { icon: PenSquare, label: '포스팅 목록', path: '/blog-posting/postings' },
       { icon: UsersRound, label: '블로거 목록', path: '/blog-posting/bloggers' },
+      { icon: Mail, label: '협업 요청', path: '/blog-posting/collab-requests' },
     ],
   },
   { icon: BarChart3, label: '수집 통계', path: '/statistics', requireFeatures: false, requireSettings: false, requireAdminManagement: false },

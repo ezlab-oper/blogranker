@@ -163,6 +163,7 @@ export default function PostingsList() {
                   <TableHead className="w-48">블로거명</TableHead>
                   <TableHead>포스팅 URL</TableHead>
                   <TableHead>제목</TableHead>
+                  <TableHead className="w-28 text-right">단가</TableHead>
                   <TableHead className="w-28 text-center">순위 추이</TableHead>
                   <TableHead className="w-36">업로드 날짜</TableHead>
                   {canPerformActions && <TableHead className="text-right w-28">작업</TableHead>}
@@ -182,6 +183,11 @@ export default function PostingsList() {
                       </a>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{p.title || '-'}</TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {p.unit_price != null
+                        ? `${p.unit_price.toLocaleString('ko-KR')}원`
+                        : <span className="opacity-50">-</span>}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Button variant="outline" size="sm" className="h-7 gap-1 text-xs"
                         onClick={() => setRankTarget(p)}>

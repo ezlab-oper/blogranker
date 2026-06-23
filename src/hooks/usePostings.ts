@@ -12,6 +12,7 @@ export interface Posting {
   program: string | null;
   target_keywords: string[] | null;
   published_at: string | null;
+  unit_price: number | null;
   created_at: string;
   updated_at: string;
   blogger?: Blogger | null; // join
@@ -25,6 +26,7 @@ export interface PostingInput {
   program?: string | null;
   target_keywords?: string[] | null;
   published_at?: string | null;
+  unit_price?: number | null;
 }
 
 export function usePostings() {

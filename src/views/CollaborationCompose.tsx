@@ -151,6 +151,8 @@ export default function CollaborationCompose() {
         emailMap.set(r.blog_url, r.email ?? '');
       });
 
+      const nowIso = new Date().toISOString();
+
       const rows = items.map((i) => {
         const prev = memoMap.get(i.blog_url) ?? '';
         const memo = prev ? `${memoLine}\n${prev}` : memoLine;
@@ -172,6 +174,7 @@ export default function CollaborationCompose() {
           is_influencer: false,
           contract_end_date: '2999-12-31',
           memo,
+          requested_at: nowIso,
         };
       });
 
@@ -186,7 +189,7 @@ export default function CollaborationCompose() {
         description: `메모에 발송 이력 추가됨 (${adminName})`,
       });
       try { sessionStorage.removeItem(COMPOSE_SELECTION_KEY); } catch { /* ignore */ }
-      router.push('/blog-posting/bloggers');
+      router.push('/blog-posting/collab-requests');
     } catch (e) {
       const msg = e instanceof Error ? e.message : '오류';
       toast({ title: '등록 실패', description: msg, variant: 'destructive' });

@@ -90,11 +90,13 @@ export default function BloggersList() {
     })();
   }, [bloggers, canPerformActions, queryClient]);
 
-  // 필터 적용 (상태·인플·등록일 기간)
+  // 블로거 목록은 '계약됨'·'계약만료'만 노출. '협업 요청'·'협업 거절'은 협업 요청 페이지로.
   const filtered = useMemo(() => {
     const cutoff = cutoffFromRange(dateRange);
     return bloggers.filter((b) => {
-      if (statusFilter && effectiveStatus(b) !== statusFilter) return false;
+      const eff = effectiveStatus(b);
+      if (eff !== '계약됨' && eff !== '계약만료') return false;
+      if (statusFilter && eff !== statusFilter) return false;
       if (infFilter === 'yes' && !b.is_influencer) return false;
       if (infFilter === 'no' && b.is_influencer) return false;
       if (cutoff && b.created_at < cutoff) return false;
@@ -162,7 +164,7 @@ export default function BloggersList() {
             <SelectTrigger className="w-40"><SelectValue placeholder="상태" /></SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="all">전체 상태</SelectItem>
-              {BLOGGER_STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {(['계약됨', '계약만료'] as const).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select

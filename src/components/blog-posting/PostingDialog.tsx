@@ -46,6 +46,9 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [metaError, setMetaError] = useState<string | null>(null);
   const lastFetchedUrl = useRef<string>('');
+  const [unitPrice, setUnitPrice] = useState<number | null>(null);
+  // 사용자가 단가를 직접 손댔는지 — 손댔으면 블로거 매칭이 바뀌어도 덮어쓰지 않음.
+  const userTouchedPrice = useRef(false);
 
   const { data: registeredKeywords = [] } = useKeywords();
   const { data: programs = [] } = usePrograms();
@@ -59,6 +62,8 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
       setManualBloggerId(initial?.blogger_id || '');
       setProgram(initial?.program || '');
       setKeywordsText((initial?.target_keywords || []).join(', '));
+      setUnitPrice(initial?.unit_price ?? null);
+      userTouchedPrice.current = initial?.unit_price != null; // 수정 모드 = 이미 값 있으면 touched로 간주
       lastFetchedUrl.current = initial?.posting_url || '';
       setMetaError(null);
     }
@@ -102,6 +107,13 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
 
   const effectiveBloggerId = autoMatch?.id || manualBloggerId || null;
   const effectiveBlogger = autoMatch || bloggers.find((b) => b.id === manualBloggerId) || null;
+
+  // 블로거 매칭이 바뀌면 단가 prefill (사용자가 직접 수정한 적 없을 때만)
+  useEffect(() => {
+    if (!userTouchedPrice.current && effectiveBlogger?.unit_price != null) {
+      setUnitPrice(effectiveBlogger.unit_price);
+    }
+  }, [effectiveBlogger]);
 
   // 의뢰 키워드 파싱
   const parsedKeywords = useMemo(() => parseKeywords(keywordsText), [keywordsText]);
@@ -160,8 +172,11 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
       program: program || null,
       target_keywords: parsedKeywords.length > 0 ? parsedKeywords : null,
       published_at,
+      unit_price: unitPrice,
     });
   };
+
+  const priceDisplay = unitPrice != null ? `${unitPrice.toLocaleString('ko-KR')}원` : '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -223,8 +238,8 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
             )}
           </div>
 
-          {/* 프로그램 + 업로드 날짜 */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* 프로그램 + 업로드 날짜 + 단가 */}
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>프로그램</Label>
               <Select value={program || 'none'}
@@ -242,6 +257,19 @@ export function PostingDialog({ open, onOpenChange, initial, bloggers, onSubmit,
               <Label htmlFor="p-published">업로드 날짜</Label>
               <Input id="p-published" type="date" value={publishedDate}
                 onChange={(e) => setPublishedDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="p-price">단가</Label>
+              <Input id="p-price" value={priceDisplay}
+                placeholder={effectiveBlogger?.unit_price != null
+                  ? `블로거 기본 ${effectiveBlogger.unit_price.toLocaleString('ko-KR')}원`
+                  : '예: 200000'}
+                onChange={(e) => {
+                  userTouchedPrice.current = true;
+                  const digits = e.target.value.replace(/[^\d]/g, '');
+                  setUnitPrice(digits === '' ? null : parseInt(digits, 10));
+                }}
+                inputMode="numeric" />
             </div>
           </div>
 
