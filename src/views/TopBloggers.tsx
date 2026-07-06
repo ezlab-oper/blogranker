@@ -305,7 +305,7 @@ export default function TopBloggers() {
           </div>
         ) : (
           <div className="rounded-xl border bg-card shadow-card overflow-hidden">
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   {canPerformActions && (
@@ -317,14 +317,14 @@ export default function TopBloggers() {
                       />
                     </TableHead>
                   )}
-                  <TableHead className="w-44">블로거</TableHead>
-                  <TableHead className="w-28">플랫폼</TableHead>
-                  <TableHead>등장 키워드</TableHead>
-                  <TableHead className="w-20 text-right">횟수</TableHead>
-                  <TableHead className="w-20 text-right">최저</TableHead>
-                  <TableHead className="w-20 text-right">평균</TableHead>
-                  <TableHead className="w-28">엔진</TableHead>
-                  <TableHead className="w-28">최근 등장</TableHead>
+                  <TableHead>블로거</TableHead>
+                  <TableHead>플랫폼</TableHead>
+                  <TableHead className="w-2/5">등장 키워드</TableHead>
+                  <TableHead className="text-right">횟수</TableHead>
+                  <TableHead className="text-right">최저</TableHead>
+                  <TableHead className="text-right">평균</TableHead>
+                  <TableHead>엔진</TableHead>
+                  <TableHead>최근 등장</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

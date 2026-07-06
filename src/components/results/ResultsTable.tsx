@@ -118,19 +118,23 @@ export function ResultsTable({
     return allKeywords.filter(kw => kw.program === selectedProgram);
   }, [allKeywords, selectedProgram]);
 
-  // 엔진 필터 → 정렬(네이버 우선, rank 오름차순)
+  // 엔진·프로그램 필터 → 정렬(네이버 우선, rank 오름차순)
   const sortedResults = useMemo(() => {
     if (!results) return undefined;
-    const filtered = selectedEngine
-      ? results.filter((r) => r.search_engine?.name === selectedEngine)
-      : results;
+    let filtered = results;
+    if (selectedProgram) {
+      filtered = filtered.filter((r) => r.keyword?.program === selectedProgram);
+    }
+    if (selectedEngine) {
+      filtered = filtered.filter((r) => r.search_engine?.name === selectedEngine);
+    }
     return [...filtered].sort((a, b) => {
       const aIsNaver = a.search_engine?.name === '네이버' ? 0 : 1;
       const bIsNaver = b.search_engine?.name === '네이버' ? 0 : 1;
       if (aIsNaver !== bIsNaver) return aIsNaver - bIsNaver;
       return a.rank - b.rank;
     });
-  }, [results, selectedEngine]);
+  }, [results, selectedEngine, selectedProgram]);
 
   // Pagination logic
   const totalItems = sortedResults?.length || 0;
