@@ -207,6 +207,23 @@ Deno.serve(async (req) => {
                 published_date: r.published_date,
                 blog_platform: r.platform,
                 thumbnail_url: r.thumbnail_url,
+                is_ai_briefing: false,
+              });
+            }
+            for (const r of (data.ai_briefing ?? [])) {
+              await supabase.from('crawl_results').insert({
+                job_id: job.id,
+                keyword_id: kw.id,
+                search_engine_id: engine.id,
+                rank: r.rank,
+                blog_title: r.title,
+                blog_author: r.author,
+                blog_url: r.url,
+                snippet: r.snippet,
+                published_date: r.published_date,
+                blog_platform: r.platform,
+                thumbnail_url: r.thumbnail_url,
+                is_ai_briefing: true,
               });
             }
             chunkSuccess++;
