@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { parseNaverIntegratedResults } from "./parser.ts";
+import { parseNaverIntegratedResults, type BlogResult } from "./parser.ts";
 import { parseGoogleResults } from "./parser_google.ts";
 
 const corsHeaders = {
@@ -101,11 +101,17 @@ Deno.serve(async (req) => {
     const markdown: string = data.data?.markdown || data.markdown || '';
     const rawHtml: string = data.data?.rawHtml || data.rawHtml || '';
 
-    const blogResults = engine === 'google'
-      ? parseGoogleResults(markdown, rawHtml)
-      : parseNaverIntegratedResults(markdown, rawHtml);
+    let blogResults: BlogResult[];
+    let aiBriefingResults: BlogResult[] = [];
+    if (engine === 'google') {
+      blogResults = parseGoogleResults(markdown, rawHtml);
+    } else {
+      const parsed = parseNaverIntegratedResults(markdown, rawHtml);
+      blogResults = parsed.organic;
+      aiBriefingResults = parsed.ai_briefing;
+    }
 
-    console.log(`Found ${blogResults.length} blog results (${engine})`);
+    console.log(`Found ${blogResults.length} organic + ${aiBriefingResults.length} ai_briefing results (${engine})`);
 
     return new Response(
       JSON.stringify({
@@ -113,6 +119,7 @@ Deno.serve(async (req) => {
         keyword,
         engine,
         results: blogResults,
+        ai_briefing: aiBriefingResults,
         raw_markdown: markdown.substring(0, 3000),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
