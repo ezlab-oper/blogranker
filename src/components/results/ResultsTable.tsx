@@ -117,14 +117,15 @@ export function ResultsTable({
   // 매칭 빌더: postings(협업 포스팅) + bloggers(협업 블로거) 단일 소스
   const matchers = useMemo(() => buildMatchers(postings, bloggers), [postings, bloggers]);
 
-  // AI 브리핑 카드용 — 순위표와 동일한 엔진/프로그램 필터 적용
+  // AI 브리핑 카드용 — 순위표와 동일한 엔진/프로그램 필터 적용.
+  // 전체 키워드에서는 여러 키워드의 브리핑이 뒤섞여 맥락이 없으므로 개별 키워드 선택 시에만 노출.
   const briefingForView = useMemo(() => {
-    if (!briefingResults) return [];
+    if (!selectedKeywordId || !briefingResults) return [];
     let f = briefingResults;
     if (selectedProgram) f = f.filter((r) => r.keyword?.program === selectedProgram);
     if (selectedEngine) f = f.filter((r) => r.search_engine?.name === selectedEngine);
     return f;
-  }, [briefingResults, selectedProgram, selectedEngine]);
+  }, [briefingResults, selectedKeywordId, selectedProgram, selectedEngine]);
 
   // Filter keywords by selected program
   const filteredKeywords = useMemo(() => {
