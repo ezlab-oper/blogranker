@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { RankTrendChart } from '@/components/trends/RankTrendChart';
+import { AiBriefingTrend } from '@/components/trends/AiBriefingTrend';
 
 export default function Trends() {
   return (
@@ -19,6 +20,9 @@ export default function Trends() {
 
         {/* Rank Trend Chart */}
         <RankTrendChart />
+
+        {/* AI 브리핑 노출 추이 */}
+        <AiBriefingTrend />
       </div>
     </AppLayout>
   );
