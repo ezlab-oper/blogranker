@@ -11,6 +11,11 @@ export interface BlogResult {
   thumbnail_url: string | null;
 }
 
+export interface NaverParseResult {
+  organic: BlogResult[];
+  ai_briefing: BlogResult[];
+}
+
 const MAX_RESULTS = 10;
 const DEFAULT_TITLE = '블로그 포스트';
 
@@ -88,6 +93,23 @@ export function isInExcludedSection(el: Element): boolean {
   return false;
 }
 
+// AI 브리핑(SDS) 블록 앵커. 2026-07-09 실측: 브리핑 위젯 전체가 fds-aib-* 클래스로 감싸짐
+// (fds-aib-header, fds-aib-expandable-container 등). 브리핑 없는 페이지엔 0건.
+// ponytail: fds-aib 단일 앵커. 네이버가 마크업 재개편하면 실측으로 이 토큰만 갱신.
+const AI_BRIEFING_CLASS_RE = /(?:^|[\s"])fds-aib/i;
+
+export function isInAiBriefing(el: Element): boolean {
+  let node: Element | null = el;
+  let depth = 0;
+  while (node && depth < 20) {
+    const cls = node.getAttribute('class');
+    if (cls && AI_BRIEFING_CLASS_RE.test(cls)) return true;
+    node = node.parentElement;
+    depth++;
+  }
+  return false;
+}
+
 export function isValidBlogPostUrl(url: string): boolean {
   if (!url || !url.startsWith('http')) return false;
   if (!BLOG_DOMAINS.some((d) => url.includes(d))) return false;
@@ -122,42 +144,49 @@ function buildMarkdownTitleMap(markdown: string): Map<string, string> {
 // rawHtml을 DOM으로 파싱해 블로그 결과를 추출.
 // href / data-url 속성에서 블로그 포스트 URL을 문서 순서대로 수집한다(클래스 비의존).
 // 제목은 노드 텍스트 → markdown → 기본값 순으로 보강한다.
-export function parseNaverIntegratedResults(markdown: string, rawHtml: string): BlogResult[] {
-  const results: BlogResult[] = [];
-  const addedUrls = new Set<string>();
+export function parseNaverIntegratedResults(markdown: string, rawHtml: string): NaverParseResult {
+  const organic: BlogResult[] = [];
+  const aiBriefing: BlogResult[] = [];
+  const organicUrls = new Set<string>();
+  const briefingUrls = new Set<string>();
   const mdTitles = buildMarkdownTitleMap(markdown);
 
-  if (!rawHtml) return results;
+  if (!rawHtml) return { organic, ai_briefing: aiBriefing };
 
   const doc = new DOMParser().parseFromString(rawHtml, 'text/html');
   if (!doc) {
     console.warn('DOMParser returned null document');
-    return results;
+    return { organic, ai_briefing: aiBriefing };
   }
 
   const nodes = Array.from(doc.querySelectorAll(LINK_NODE_SELECTOR)) as unknown as Element[];
 
   for (const node of nodes) {
-    if (results.length >= MAX_RESULTS) break;
-
     const url = node.getAttribute('href') || node.getAttribute('data-url') || '';
     if (!isValidBlogPostUrl(url)) continue;
-    if (isInExcludedSection(node)) continue;
+    if (isInExcludedSection(node)) continue; // 광고/레거시 제외 섹션은 완전 배제
+
+    const inBriefing = isInAiBriefing(node);
+    const bucket = inBriefing ? aiBriefing : organic;
+    const seen = inBriefing ? briefingUrls : organicUrls;
+
+    // organic만 10건 상한 (브리핑은 소수라 미적용)
+    if (!inBriefing && organic.length >= MAX_RESULTS) continue;
 
     const nodeTitle = cleanTitle(node.textContent);
 
-    if (addedUrls.has(url)) {
+    if (seen.has(url)) {
       // 이미 추가된 URL의 제목이 기본값이면 더 나은 텍스트로 교체
       if (nodeTitle) {
-        const existing = results.find((r) => r.url === url);
+        const existing = bucket.find((r) => r.url === url);
         if (existing && existing.title === DEFAULT_TITLE) existing.title = nodeTitle;
       }
       continue;
     }
 
-    addedUrls.add(url);
-    results.push({
-      rank: results.length + 1,
+    seen.add(url);
+    bucket.push({
+      rank: bucket.length + 1,
       title: nodeTitle ?? mdTitles.get(url) ?? DEFAULT_TITLE,
       author: extractAuthorFromUrl(url),
       url,
@@ -168,13 +197,13 @@ export function parseNaverIntegratedResults(markdown: string, rawHtml: string): 
     });
   }
 
-  // 기본 제목 최종 보강 (markdown)
-  for (const r of results) {
+  // 기본 제목 최종 보강 (markdown) — 두 버킷 모두
+  for (const r of [...organic, ...aiBriefing]) {
     if (r.title === DEFAULT_TITLE) {
       const better = mdTitles.get(r.url);
       if (better) r.title = better;
     }
   }
 
-  return results;
+  return { organic, ai_briefing: aiBriefing };
 }
