@@ -54,7 +54,7 @@ export function useStatistics(dateRange?: DateRange) {
   const overviewQuery = useQuery({
     queryKey: ['statistics', 'overview', fromDate, toDate],
     queryFn: async (): Promise<OverviewStats> => {
-      let resultsQuery = supabase.from('crawl_results').select('rank', { count: 'exact' });
+      let resultsQuery = supabase.from('crawl_results').select('rank', { count: 'exact' }).eq('is_ai_briefing', false);
       
       if (fromDate) {
         resultsQuery = resultsQuery.gte('crawled_at', fromDate);
@@ -106,6 +106,7 @@ export function useStatistics(dateRange?: DateRange) {
         let query = supabase
           .from('crawl_results')
           .select('rank')
+          .eq('is_ai_briefing', false)
           .eq('search_engine_id', engine.id);
 
         if (fromDate) {
@@ -135,7 +136,7 @@ export function useStatistics(dateRange?: DateRange) {
   const platformStatsQuery = useQuery({
     queryKey: ['statistics', 'platforms', fromDate, toDate],
     queryFn: async (): Promise<PlatformStats[]> => {
-      let query = supabase.from('crawl_results').select('blog_platform').limit(50000);
+      let query = supabase.from('crawl_results').select('blog_platform').eq('is_ai_briefing', false).limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);
@@ -164,7 +165,7 @@ export function useStatistics(dateRange?: DateRange) {
   const dailyStatsQuery = useQuery({
     queryKey: ['statistics', 'daily', fromDate, toDate],
     queryFn: async (): Promise<DailyStats[]> => {
-      let query = supabase.from('crawl_results').select('crawled_at, search_engine_id').limit(50000);
+      let query = supabase.from('crawl_results').select('crawled_at, search_engine_id').eq('is_ai_briefing', false).limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);
@@ -217,7 +218,7 @@ export function useStatistics(dateRange?: DateRange) {
   const rankDistributionQuery = useQuery({
     queryKey: ['statistics', 'rankDistribution', fromDate, toDate],
     queryFn: async (): Promise<RankDistribution[]> => {
-      let query = supabase.from('crawl_results').select('rank').limit(50000);
+      let query = supabase.from('crawl_results').select('rank').eq('is_ai_briefing', false).limit(50000);
 
       if (fromDate) {
         query = query.gte('crawled_at', fromDate);

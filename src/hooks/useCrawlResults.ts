@@ -24,6 +24,8 @@ export function useCrawlResults(filters?: {
   crawl_date?: string;
   // ISO timestamp. 지정 시 crawled_at >= 이 값. (기간 그래프용 — 서버에서 잘라 limit 절약)
   crawled_after?: string;
+  // organic(순위)만 / AI 브리핑만. 기본 organic만.
+  aiBriefing?: 'exclude' | 'only';
 }) {
   return useQuery({
     queryKey: ['crawl_results', filters],
@@ -39,6 +41,10 @@ export function useCrawlResults(filters?: {
         `)
         .order('crawled_at', { ascending: false })
         .limit(limit);
+
+      // organic(순위) 조회는 브리핑 행 제외, AI 마크 조회는 브리핑 행만.
+      const aiMode = filters?.aiBriefing ?? 'exclude';
+      query = query.eq('is_ai_briefing', aiMode === 'only');
 
       if (filters?.keyword_id) {
         query = query.eq('keyword_id', filters.keyword_id);
@@ -122,8 +128,8 @@ export function useDashboardStats() {
       
       const [keywordsRes, resultsRes, todayRes] = await Promise.all([
         supabase.from('keywords').select('id, is_active'),
-        supabase.from('crawl_results').select('crawled_at').order('crawled_at', { ascending: false }).limit(1),
-        supabase.from('crawl_results').select('id').gte('crawled_at', today),
+        supabase.from('crawl_results').select('crawled_at').eq('is_ai_briefing', false).order('crawled_at', { ascending: false }).limit(1),
+        supabase.from('crawl_results').select('id').eq('is_ai_briefing', false).gte('crawled_at', today),
       ]);
 
       const keywords = keywordsRes.data || [];
@@ -133,7 +139,8 @@ export function useDashboardStats() {
       // Get total results count
       const { count } = await supabase
         .from('crawl_results')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('is_ai_briefing', false);
 
       return {
         totalKeywords: keywords.length,
