@@ -54,6 +54,7 @@ export interface CrawlResult {
   published_date: string | null;
   blog_platform: string | null;
   thumbnail_url: string | null;
+  is_ai_briefing: boolean;
   crawled_at: string;
   created_at: string;
   keyword?: Keyword;

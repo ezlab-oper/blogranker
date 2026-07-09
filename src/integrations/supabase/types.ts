@@ -144,6 +144,7 @@ export type Database = {
           crawled_at: string
           created_at: string
           id: string
+          is_ai_briefing: boolean
           job_id: string | null
           keyword_id: string
           published_date: string | null
@@ -160,6 +161,7 @@ export type Database = {
           crawled_at?: string
           created_at?: string
           id?: string
+          is_ai_briefing?: boolean
           job_id?: string | null
           keyword_id: string
           published_date?: string | null
@@ -176,6 +178,7 @@ export type Database = {
           crawled_at?: string
           created_at?: string
           id?: string
+          is_ai_briefing?: boolean
           job_id?: string | null
           keyword_id?: string
           published_date?: string | null
