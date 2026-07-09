@@ -31,6 +31,7 @@ interface ScrapeResponse {
   keyword?: string;
   engine?: string;
   results?: BlogResult[];
+  ai_briefing?: BlogResult[];
   error?: string;
 }
 
@@ -201,9 +202,39 @@ export async function runCrawlJob(
             published_date: r.published_date,
             blog_platform: r.platform,
             thumbnail_url: r.thumbnail_url,
+            is_ai_briefing: false,
           }));
 
           await supabase.from('crawl_results').insert(resultsToInsert);
+
+          // AI 브리핑 행은 별도 플래그로 저장 (organic과 공존)
+          if (result.ai_briefing && result.ai_briefing.length > 0) {
+            const briefingSeen = new Set<string>();
+            const briefingRows = result.ai_briefing
+              .filter((r) => {
+                if (briefingSeen.has(r.url)) return false;
+                briefingSeen.add(r.url);
+                return true;
+              })
+              .map((r) => ({
+                job_id: job.id,
+                keyword_id: kw.id,
+                search_engine_id: engine.id,
+                rank: r.rank,
+                blog_title: r.title,
+                blog_author: r.author,
+                blog_url: r.url,
+                snippet: r.snippet,
+                published_date: r.published_date,
+                blog_platform: r.platform,
+                thumbnail_url: r.thumbnail_url,
+                is_ai_briefing: true,
+              }));
+            if (briefingRows.length > 0) {
+              await supabase.from('crawl_results').insert(briefingRows);
+            }
+          }
+
           successful++;
         } else {
           failed++;
