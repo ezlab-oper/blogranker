@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useCrawlResults, useSearchEngines } from '@/hooks/useCrawlResults';
 import { useKeywords } from '@/hooks/useKeywords';
+import { AiBriefingCard } from './AiBriefingCard';
 import { buildMatchers, getMatchType, type MatchType } from '@/hooks/useBlogUrls';
 import { useBloggers } from '@/hooks/useBloggers';
 import { usePostings } from '@/hooks/usePostings';
@@ -98,6 +99,11 @@ export function ResultsTable({
     keyword_id: selectedKeywordId || undefined,
     crawl_date: selectedDate || undefined,
   });
+  const { data: briefingResults } = useCrawlResults({
+    keyword_id: selectedKeywordId || undefined,
+    crawl_date: selectedDate || undefined,
+    aiBriefing: 'only',
+  });
   const { data: allKeywords } = useKeywords();
   // buildMatchers가 status 기준으로 계약됨/계약만료를 내부에서 분리한다.
   const { data: bloggers = [] } = useBloggers();
@@ -110,6 +116,15 @@ export function ResultsTable({
 
   // 매칭 빌더: postings(협업 포스팅) + bloggers(협업 블로거) 단일 소스
   const matchers = useMemo(() => buildMatchers(postings, bloggers), [postings, bloggers]);
+
+  // AI 브리핑 카드용 — 순위표와 동일한 엔진/프로그램 필터 적용
+  const briefingForView = useMemo(() => {
+    if (!briefingResults) return [];
+    let f = briefingResults;
+    if (selectedProgram) f = f.filter((r) => r.keyword?.program === selectedProgram);
+    if (selectedEngine) f = f.filter((r) => r.search_engine?.name === selectedEngine);
+    return f;
+  }, [briefingResults, selectedProgram, selectedEngine]);
 
   // Filter keywords by selected program
   const filteredKeywords = useMemo(() => {
@@ -316,6 +331,9 @@ export function ResultsTable({
           CSV 내보내기
         </Button>
       </div>
+
+      {/* AI 브리핑 노출 카드 (순위표 상단) */}
+      <AiBriefingCard results={briefingForView} matchers={matchers} />
 
       {/* Highlight Legend */}
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
